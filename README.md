@@ -1,5 +1,5 @@
 # hcore-anvil
-======================================
+=============
 
 hcore-anvil is a CPU core that implements [RISC-V RV32I Instruction Set](http://riscv.org).
 
