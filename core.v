@@ -20,8 +20,8 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-//hcore top module
-module hcore(
+//hcore-anvil top module
+module anvil(
     input clk,
     input resetn,
 
