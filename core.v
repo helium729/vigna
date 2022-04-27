@@ -48,34 +48,34 @@ reg [31:0] pc;
 wire [31:0] pc_next;
 
 //part 1: fetching unit
-reg [31:0] inst;
-reg [31:0] inst_addr;
+wire [31:0] inst;
+wire [31:0] inst_addr;
 reg [1:0] fetch_state;
 
 reg fetch_recieved;
 wire fetched;
-assign fetched = fetch_state == 2;
+assign fetched = fetch_state == 1 && i_ready;
+
+assign inst = i_rdata;
+assign inst_addr = i_addr;
 
 always @ (posedge clk) begin
     //reset logic
     if (!resetn) begin
         pc <= 0;
-        inst <= 0;
-        inst_addr <= 0;
         fetch_state <= 0;
+        i_valid <= 0;
+        i_addr <= 0;
     end else begin
         //fetch logic
         case (fetch_state)
             0: begin
                 i_valid <= 1;
                 i_addr <= pc;
-                inst_addr <= pc;
-                pc <= pc_next;
                 fetch_state <= 1;
             end
             1: begin
                 if (i_ready) begin
-                    inst <= i_rdata;
                     i_valid <= 0;
                     fetch_state <= 2;
                 end
@@ -84,7 +84,6 @@ always @ (posedge clk) begin
                 if (fetch_recieved) begin
                     i_valid <= 1;
                     i_addr <= pc;
-                    inst_addr <= pc;
                     pc <= pc_next;
                     fetch_state <= 1;
                 end
@@ -168,9 +167,9 @@ assign is_load = is_lb || is_lh || is_lw || is_lbu || is_lhu;
 
 //s type
 wire is_sb, is_sh, is_sw;
-assign is_sb = funct3 == 3'b010 && s_type;
-assign is_sh = funct3 == 3'b011 && s_type;
-assign is_sw = funct3 == 3'b000 && s_type;
+assign is_sb = funct3 == 3'b000 && s_type;
+assign is_sh = funct3 == 3'b001 && s_type;
+assign is_sw = funct3 == 3'b010 && s_type;
 
 //b type
 wire is_beq, is_bne, is_blt, is_bge, is_bltu, is_bgeu;
@@ -321,7 +320,7 @@ always @ (posedge clk) begin
                     //set strobe
                     if (is_lw || is_sw) ls_strb <= 4'b1111;
                     else if (is_lh || is_lhu || is_sh) ls_strb <= 4'b0011;
-                    else if (is_lb || is_lbu || is_sb) ls_strb <= 4'b0011;
+                    else if (is_lb || is_lbu || is_sb) ls_strb <= 4'b0001;
 
                     if (is_lw || is_lh || is_lb) ls_sign_extend <= 1;
                     else ls_sign_extend <= 0;
