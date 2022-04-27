@@ -1,27 +1,27 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
+// Company: Wuhan University
+// Engineer: Xuanyu Hu
 // 
 // Create Date: 2022/04/27 16:39:33
-// Design Name: 
-// Module Name: main
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
+// Design Name: hcore-anvil
+// Module Name: anvil
+// Project Name: hcore-anvil
+// Description: A simple RV32I CPU core
 // 
-// Dependencies: 
+// Dependencies: none
 // 
-// Revision:
-// Revision 0.01 - File Created
+// Revision: 
+// Revision 0.03 - Optimizing the code
 // Additional Comments:
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
 
 //hcore-anvil top module
-module anvil(
+module anvil#(
+    parameter RESET_ADDR = 32'h0000_0000
+    )(
     input clk,
     input resetn,
 
@@ -62,7 +62,7 @@ assign inst_addr = i_addr;
 always @ (posedge clk) begin
     //reset logic
     if (!resetn) begin
-        pc <= 0;
+        pc <= RESET_ADDR;
         fetch_state <= 0;
         i_valid <= 0;
         i_addr <= 0;
