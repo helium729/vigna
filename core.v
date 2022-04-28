@@ -19,7 +19,7 @@
 
 
 //hcore-anvil top module
-module anvil#(
+module vigna#(
     parameter RESET_ADDR = 32'h0000_0000
     )(
     input clk,
