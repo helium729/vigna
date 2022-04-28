@@ -18,7 +18,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-//hcore-anvil top module
+//vigna top module
 module vigna#(
     parameter RESET_ADDR = 32'h0000_0000
     )(
