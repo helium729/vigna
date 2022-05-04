@@ -27,7 +27,7 @@ module vigna#(
 
     output reg        i_valid,
     input             i_ready,
-    output reg [31:0] i_addr,
+    output     [31:0] i_addr,
     input      [31:0] i_rdata,
     output     [31:0] i_wdata,
     output     [ 3:0] i_wstrb,
@@ -58,6 +58,7 @@ assign fetched = (fetch_state == 1 && i_ready) || fetch_state == 2;
 
 assign inst = i_rdata;
 assign inst_addr = i_addr;
+assign i_addr = pc;
 
 always @ (posedge clk) begin
     //reset logic
@@ -65,13 +66,11 @@ always @ (posedge clk) begin
         pc          <= RESET_ADDR;
         fetch_state <= 0;
         i_valid     <= 0;
-        i_addr      <= 0;
     end else begin
         //fetch logic
         case (fetch_state)
             0: begin
                 i_valid     <= 1;
-                i_addr      <= pc;
                 fetch_state <= 1;
             end
             1: begin
@@ -83,7 +82,6 @@ always @ (posedge clk) begin
             2: begin
                 if (fetch_recieved) begin
                     i_valid     <= 1;
-                    i_addr      <= pc;
                     pc          <= pc_next;
                     fetch_state <= 1;
                 end
@@ -125,7 +123,7 @@ assign i_imm = {{20{inst[31]}}, inst[31:20]};
 assign s_imm = {{20{inst[31]}}, inst[31:25], inst[11:7]};
 assign b_imm = {{19{inst[31]}}, inst[31], inst[7], inst[30:25], inst[11:8], 1'b0};
 assign u_imm = {inst[31:12], 12'b0};
-assign j_imm = {{12{inst[31]}}, inst[31], inst[19:12], inst[20], inst[30:21]};
+assign j_imm = {{11{inst[31]}}, inst[31], inst[19:12], inst[20], inst[30:21], 1'b0};
 
 wire [4:0] shamt;
 assign shamt = inst[24:20];
@@ -263,7 +261,7 @@ assign ex_jump = ex_type[1];
 assign ex_calc = ex_type[2];
 assign ex_ls = ex_type[3];
 
-assign pc_next = ex_branch ? (dr[0] ? branch_addr : pc + 32'd4) : ex_jump ? dr - 4 : pc + 32'd4;
+assign pc_next = ex_branch ? (dr[0] ? branch_addr : pc + 32'd4) : ex_jump ? dr : pc + 32'd4;
 
 reg write_mem;
 
@@ -299,8 +297,9 @@ always @ (posedge clk) begin
                     end else begin
                         d3 <= 0;
                     end
+                
                     fetch_recieved <= 1;
-                    //requires write back
+                    
                     if (u_type || j_type || i_type || r_type) begin
                         wb_reg <= rd;
                     end else begin
