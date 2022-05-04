@@ -54,7 +54,7 @@ reg  [ 1:0] fetch_state;
 
 reg fetch_recieved;
 wire fetched;
-assign fetched = fetch_state == 1 && i_ready;
+assign fetched = (fetch_state == 1 && i_ready) || fetch_state == 2;
 
 assign inst = i_rdata;
 assign inst_addr = i_addr;
@@ -229,7 +229,7 @@ assign sd2 = d2 + 33'b0_1000_0000_0000_0000_0000_0000_0000_0000;
 
 //alu comb logic
 assign dr = 
-    is_add || is_addi || is_jal 
+    is_add || is_addi || is_jal || s_type
     || is_jalr || is_load || u_type ? d1 + d2 :
     is_sub                          ? d1 - d2 : 
     is_sll || is_slli               ? d1 << d2 : 
@@ -263,7 +263,7 @@ assign ex_jump = ex_type[1];
 assign ex_calc = ex_type[2];
 assign ex_ls = ex_type[3];
 
-assign pc_next = ex_branch ? (dr[0] ? branch_addr : pc + 32'd4) : ex_jump ? dr : pc + 32'd4;
+assign pc_next = ex_branch ? (dr[0] ? branch_addr : pc + 32'd4) : ex_jump ? dr - 4 : pc + 32'd4;
 
 reg write_mem;
 
@@ -386,7 +386,7 @@ always @ (posedge clk) begin
                         else                         cpu_regs[wb_reg] <= d_rdata;
                     end
                 end
-
+                fetch_recieved <= 0;
             end
             6: begin
                 //store wait stage
@@ -394,7 +394,9 @@ always @ (posedge clk) begin
                     exec_state <= 0;
                     d_valid    <= 0;
                     d_wstrb    <= 4'd0;
+                    d_wdata    <= 0;
                 end
+                fetch_recieved <= 0;
 
             end
             default: begin

@@ -50,8 +50,8 @@ assign m1_ready = rs_qm1 ? s_ready : 1'b0;
 assign m2_ready = rs_qm2 ? s_ready : 1'b0;
 assign s_addr   = rs_qm1 ? m1_addr :
                   rs_qm2 ? m2_addr : 32'h0;
-assign m1_rdata = rs_qm1 ? s_rdata : 32'h0;
-assign m2_rdata = rs_qm2 ? s_rdata : 32'h0;
+assign m1_rdata = rs_qm1 ? s_rdata : m1_rdata;
+assign m2_rdata = rs_qm2 ? s_rdata : m2_rdata;
 assign s_wdata  = rs_qm1 ? m1_wdata :
                   rs_qm2 ? m2_wdata : 32'h0;
 assign s_wstrb  = rs_qm1 ? m1_wstrb : 
