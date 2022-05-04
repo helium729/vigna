@@ -4,15 +4,15 @@
 // Engineer: Xuanyu Hu
 // 
 // Create Date: 2022/04/27 16:39:33
-// Design Name: hcore-anvil
-// Module Name: anvil
-// Project Name: hcore-anvil
+// Design Name: vigna_v1
+// Module Name: vigna
+// Project Name: vigna
 // Description: A simple RV32I CPU core
 // 
 // Dependencies: none
 // 
 // Revision: 
-// Revision 0.03 - Optimizing the code
+// Revision 1.05 - fix jal bug
 // Additional Comments:
 // 
 //////////////////////////////////////////////////////////////////////////////////
@@ -54,7 +54,7 @@ reg  [ 1:0] fetch_state;
 
 reg fetch_recieved;
 wire fetched;
-assign fetched = (fetch_state == 1 && i_ready) || fetch_state == 2;
+assign fetched = (fetch_state == 1 && i_ready) || fetch_state == 3;
 
 assign inst = i_rdata;
 assign inst_addr = i_addr;
@@ -76,10 +76,10 @@ always @ (posedge clk) begin
             1: begin
                 if (i_ready) begin
                     i_valid     <= 0;
-                    fetch_state <= 2;
+                    fetch_state <= 3;
                 end
             end
-            2: begin
+            3: begin
                 if (fetch_recieved) begin
                     i_valid     <= 1;
                     pc          <= pc_next;
