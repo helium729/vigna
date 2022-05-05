@@ -6,14 +6,17 @@ Tools (gcc, binutils, etc..) can be obtained via the [RISC-V Website](https://ri
 
 The current version is v1.05
 
-**Warning: This project is in devlopment and not fully tested, please don't use in real world!**
+**Warning: This project is not fully tested yet, please use with cautious in real world!**
+
+**If you find a bug or have any problems, you can create a issue.**
+
+**Various contributions are welcomed!**
 
 
 #### Table of Contents
 
 - [Features and Typical Applications](#features-and-typical-applications)
 - [Files in this Repository](#files-in-this-repository)
-- [Performance](#performance)
 - [Memory Interface](#memory-interface)
 - [Evaluation](#evaluation)
 - [Future Plans](#future-plans)
@@ -26,4 +29,60 @@ This core can be integrated into other systems and used as an auxiliary core on 
 
 Files in this Repository
 -----------------
+#### README.md
+You are reading it right now.
 
+#### core.v
+This Verilog file contains module `vigna`, which is the design rtl code of the core. The module in this file has separated instruction bus and data bus. The argument RESET_ADDR indicates the reset address on reset.
+
+#### bus2in1.v
+This Verilog file contains a module that merge 2 bus interfaces into one. This module uses a simple RS-latch logic. It is possible that warnings mignt occure when using linters like verilator or when synthesizing using yosys, but it should wok out fine on FPGAs. If it turned out to be an error that cannot be solved, try fixing this by replacing the RS-latch logic with primitives.
+
+#### vigna_top.v
+This Verilog file contains module `vigna_top`, which is a wrapper of vigna core. The interface of vigna_top only contains one 32-bit bus.
+
+#### axi_adapter
+This Verilog file contains a module that adapts current bus into an AXI4-Lite bus interface. This adapter can be used with module vigna or vigna_top.
+
+Memory Interface
+-----------------
+The memory interface is basically the same to [picorv32](https://github.com/YosysHQ/picorv32). The interface is a simple valid-ready interface that can run one memory transfer at a time:
+
+    output        valid,
+    input         ready,
+    output [31:0] addr,
+    input  [31:0] rdata,
+    output [31:0] wdata,
+    output [ 3:0] wstrb
+
+The core initiates a memory transfer by asserting `valid`. The valid signal stays high until the peer asserts `ready`. All core outputs are stable over the `valid` period. The transacton is done when both `valid` and `ready` are high. When the transaction is done, the core pulls `valid` down, and the peer should pull `ready` down as soon as it finds `valid` down.
+
+#### Read Transfer
+
+In a read transfer `wstrb` *must* has the value 0 and `wdata` is unused.
+
+The memory reads the address `mem_addr` and makes the read value available on `mem_rdata` in the cycle `mem_ready` is high.
+
+There is no need for an external wait cycle. The memory read can be implemented asynchronously with `mem_ready` going high in the same cycle as `mem_valid`.
+
+
+#### Write Transfer
+In a write transfer `wstrb` is *not* 0 and `rdata` is unused. The memory write the data at `wdata` to the address `addr` and acknowledges the transfer by asserting `ready`.
+
+The 4 bits of `wstrb` are write enables for the four bytes in the addressed
+word. Only the 4 values `0000`, `1111`, `0011`, `0001` are possible, i.e. no write, write 32 bits, 
+write lower 16 bits, or write a single byte.
+
+There is no need for an external wait cycle. The memory can acknowledge the
+write immediately  with `ready` going high in the same cycle as `valid`.
+
+Evaluation
+----------
+//ToDo
+
+Future Plans
+---------
+Current: more tests and debugging.
+Next: more documentation about design details.
+
+//ToDo

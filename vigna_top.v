@@ -30,7 +30,10 @@ wire [31:0] d_wdata;
 wire [3:0] d_wstrb;
 
 //vigna core instant
-vigna core(
+vigna #(
+    .RESET_ADDR(RESET_ADDR)
+    )
+    core_inst(
     .clk(clk),
     .resetn(resetn),
     .i_valid(i_valid),
