@@ -6,9 +6,9 @@ Tools (gcc, binutils, etc..) can be obtained via the [RISC-V Website](https://ri
 
 The current version is v1.05
 
-**Warning: This project is not fully tested yet, please use with caution in real world!**
+**Warning: This project is not fully tested yet, please use with caution in the real world!**
 
-**If you find a bug or have any problems, you can create a issue.**
+**If you find a bug or have any questions, you can create a issue.**
 
 **Various contributions are welcomed!**
 
