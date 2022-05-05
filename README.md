@@ -61,9 +61,9 @@ The core initiates a memory transfer by asserting `valid`. The valid signal stay
 
 In a read transfer `wstrb` *must* has the value 0 and `wdata` is unused.
 
-The memory reads the address `mem_addr` and makes the read value available on `mem_rdata` in the cycle `mem_ready` is high.
+The memory reads the address `addr` and makes the read value available on `rdata` in the cycle `ready` is high.
 
-There is no need for an external wait cycle. The memory read can be implemented asynchronously with `mem_ready` going high in the same cycle as `mem_valid`.
+There is no need for an external wait cycle. The memory read can be implemented asynchronously with `ready` going high in the same cycle as `valid`.
 
 
 #### Write Transfer
