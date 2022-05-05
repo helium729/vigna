@@ -8,7 +8,7 @@ The current version is v1.05
 
 **Warning: This project is not fully tested yet, please use with caution in the real world!**
 
-**If you find a bug or have any questions, you can create a issue.**
+**If you find a bug or have any questions, you can create an issue.**
 
 **Various contributions are welcomed!**
 
@@ -25,7 +25,7 @@ Features and Typical Applications
 --------------------------------
 Vigna is a two-stage pipelined micro-controller style CPU. The core has an approximate CPI of 3 when the instruction bus and data bus are separated. The micro-controller is size-optimized and has a simple extensible bus.
 
-This core can be integrated into other systems and used as an auxiliary core on FPGA. Due to the small size and low logic load, it can be easily adapted into various systems.
+This core can be integrated into other systems and used as an auxiliary core on a FPGA. Due to the small size and low logic payload, it can be easily adapted into various systems.
 
 Files in this Repository
 -----------------
@@ -36,7 +36,7 @@ You are reading it right now.
 This Verilog file contains module `vigna`, which is the design rtl code of the core. The module in this file has separated instruction bus and data bus. The argument RESET_ADDR indicates the reset address on reset.
 
 #### bus2in1.v
-This Verilog file contains a module that merge 2 bus interfaces into one. This module uses a simple RS-latch logic. It is possible that warnings mignt occure when using linters like verilator or when synthesizing using yosys, but it should wok out fine on FPGAs. If it turned out to be an error that cannot be solved, try fixing this by replacing the RS-latch logic with primitives.
+This Verilog file contains a module that merge 2 bus interfaces into one. This module uses a simple RS-latch logic. It is possible that warnings mignt occure when using linters like verilator or when synthesizing using yosys, but it should workout fine on FPGAs. If it turned out to be an error that cannot be solved, try fixing this by replacing the RS-latch logic with primitives.
 
 #### vigna_top.v
 This Verilog file contains module `vigna_top`, which is a wrapper of vigna core. The interface of vigna_top only contains one 32-bit bus.
