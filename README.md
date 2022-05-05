@@ -46,7 +46,7 @@ This Verilog file contains a module that adapts current bus into an AXI4-Lite bu
 
 Memory Interface
 -----------------
-The memory interface is basically the same to [picorv32](https://github.com/YosysHQ/picorv32). The interface is a simple valid-ready interface that can run one memory transfer at a time:
+The memory interface is basically the same with [picorv32](https://github.com/YosysHQ/picorv32). The interface is a simple valid-ready interface that can run one memory transfer at a time:
 
     output        valid,
     input         ready,
