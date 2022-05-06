@@ -187,6 +187,10 @@ assign is_auipc = opcode == 7'b0010111 && u_type;
 wire is_jal;
 assign is_jal = j_type;
 
+//illegal instruction
+wire is_illegal;
+assign is_illegal = !(is_add || is_sub || is_sll || is_slt || is_sltu || is_xor || is_srl || is_sra || is_or || is_and || is_addi || is_slli || is_slti || is_sltiu || is_xori || is_srli || is_srai || is_ori || is_andi || is_jalr || is_lb || is_lh || is_lw || is_lbu || is_lhu || is_sb || is_sh || is_sw || is_beq || is_bne || is_blt || is_bge || is_bltu || is_bgeu || is_lui || is_auipc || is_jal);
+
 
 //cpu regs
 reg [31:0] cpu_regs[31:0];
@@ -243,7 +247,8 @@ assign dr =
     is_blt                          ? (sd1[31:0] < sd2[31:0] ? 32'd1 : 32'd0) : 
     is_bge                          ? (sd1[31:0] >= sd2[31:0] ? 32'd1 : 32'd0) : 
     is_bltu                         ? (d1 < d2 ? 32'd1 : 32'd0) : 
-    is_bgeu                         ? (d1 >= d2 ? 32'd1 : 32'd0) : 32'd0;
+    is_bgeu                         ? (d1 >= d2 ? 32'd1 : 32'd0) :
+    is_illegal                      ? 32'd0 : 32'd0;
 
 //branch addr and return addr
 reg [31:0] branch_addr, return_addr;
@@ -316,7 +321,7 @@ always @ (posedge clk) begin
                             write_mem <= 0;
                         end
                     end
-                    else if (r_type || (i_type & !is_load & !is_jalr) || u_type) begin
+                    else if (r_type || (i_type & !is_load & !is_jalr) || u_type || is_illegal) begin
                         exec_state <= 2;
                     end
                     else if (is_jal || is_jalr) begin
