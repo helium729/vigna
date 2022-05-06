@@ -1,5 +1,5 @@
 `include "core.v"
-`include "bus2in1.v"
+`include "utils/bus2to1.v"
 
 module vigna_top#(
     parameter RESET_ADDR = 32'h0000_0000
@@ -50,8 +50,8 @@ vigna #(
     .d_wstrb(d_wstrb)
     );
 
-//bus2in1 instant
-bus2in1 b21(
+//bus2to1 instant
+bus2to1 b21(
     .clk(clk),
     .resetn(resetn),
     .m1_valid(i_valid),

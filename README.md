@@ -35,14 +35,22 @@ You are reading it right now.
 #### core.v
 This Verilog file contains module `vigna`, which is the design rtl code of the core. The module in this file has separated instruction bus and data bus. The argument RESET_ADDR indicates the reset address on reset.
 
-#### bus2in1.v
-This Verilog file contains a module that merge 2 bus interfaces into one. This module uses a simple RS-latch logic. It is possible that warnings mignt occure when using linters like verilator or when synthesizing using yosys, but it should workout fine on FPGAs. If it turned out to be an error that cannot be solved, try fixing this by replacing the RS-latch logic with primitives.
-
 #### vigna_top.v
 This Verilog file contains module `vigna_top`, which is a wrapper of vigna core. The interface of vigna_top only contains one 32-bit bus.
 
-#### axi_adapter
+
+#### Utils
+This directory contains MISC files for adaptions on different platforms.
+Design files including gpio and AXI4-Lite adapters are in this directory.
+
+##### bus2to1.v
+This Verilog file contains a module that merge 2 bus interfaces into one. This module uses a simple RS-latch logic. It is possible that warnings mignt occure when using linters like verilator or when synthesizing using yosys, but it should workout fine on FPGAs. If it turned out to be an error that cannot be solved, try fixing this by replacing the RS-latch logic with primitives.
+
+##### axi_adapter
 This Verilog file contains a module that adapts current bus into an AXI4-Lite bus interface. This adapter can be used with module vigna or vigna_top.
+
+#### isa_tests
+ISA unit test files from https://github.com/riscv/riscv-tests/tree/master/isa/rv32ui 
 
 Memory Interface
 -----------------

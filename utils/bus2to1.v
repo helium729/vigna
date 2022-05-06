@@ -1,4 +1,4 @@
-module bus2in1(
+module bus2to1(
     input clk,
     input resetn,
 

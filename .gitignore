@@ -3,3 +3,8 @@ abc.history
 htest/
 
 devlog.txt
+
+*.o
+*.dump
+obj_dir/
+*.elf
