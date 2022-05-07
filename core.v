@@ -56,7 +56,7 @@ reg fetch_recieved;
 wire fetched;
 assign fetched = (fetch_state == 1 && i_ready) || fetch_state == 3;
 
-assign inst = i_rdata;
+assign inst = i_ready ? i_rdata : inst;
 assign inst_addr = i_addr;
 assign i_addr = pc;
 
