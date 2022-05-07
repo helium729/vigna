@@ -8,3 +8,8 @@ devlog.txt
 *.dump
 obj_dir/
 *.elf
+*.bin
+*.hex
+isa_test/*.py
+*.vvp
+*.vcd
