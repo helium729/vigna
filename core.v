@@ -208,8 +208,9 @@ assign op1 = is_jal ? j_imm :
              rs1_val;
 assign op2 = r_type || b_type   ? rs2_val :
              s_type             ? s_imm :
-             u_type || j_type   ? inst_addr :
+             is_auipc || j_type ? inst_addr :
              is_slli || is_srli ? {27'b0, shamt} :
+             is_lui             ? 32'd0 :
              i_imm; 
 
 //backend state

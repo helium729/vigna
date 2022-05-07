@@ -11,7 +11,7 @@ module mem_sim(
 );
 
 initial begin
-    $readmemh("mem.txt", mem_data, 0, 47);
+    $readmemh("mem.txt", mem_data, 0, 259);
 end
 
 reg [7:0] mem_data[4095:0];
