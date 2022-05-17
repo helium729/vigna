@@ -50,7 +50,7 @@ This Verilog file contains a module that merge 2 bus interfaces into one. This m
 This Verilog file contains a module that adapts current bus into an AXI4-Lite bus interface. This adapter can be used with module vigna or vigna_top.
 
 #### isa_tests
-ISA unit test files from https://github.com/riscv/riscv-tests/tree/master/isa/rv32ui 
+This folder only exists in branch test. This folder contains ISA unit test files from https://github.com/riscv/riscv-tests/tree/master/isa/rv32ui 
 
 Memory Interface
 -----------------
