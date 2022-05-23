@@ -17,29 +17,29 @@ module gpio_o#(
     output [WIDTH-1:0] gpo
 );
 
-reg [WIDTH-1:0] buff=DEFAULT_VALUE;
-reg hand_shake=1'b0;
+    reg [WIDTH-1:0] buff=DEFAULT_VALUE;
+    reg hand_shake=1'b0;
 
-assign ready = valid & hand_shake;
-assign gpo = buff;
+    assign ready = valid & hand_shake;
+    assign gpo = buff;
 
-assign rdata = 32'd0;
+    assign rdata = 32'd0;
 
-always @(posedge clk or negedge reset_n) begin
-    if (!reset_n) begin
-        hand_shake <= 1'b0;
-        buff <= DEFAULT_VALUE;
-    end 
-    else begin
-        if (valid) begin
-            hand_shake <= 1'b1;
-            buff <= wdata[WIDTH-1:0];
+    always @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            hand_shake <= 1'b0;
+            buff <= DEFAULT_VALUE;
         end 
         else begin
-            hand_shake <= 1'b0;
+            if (valid) begin
+                hand_shake <= 1'b1;
+                buff <= wdata[WIDTH-1:0];
+            end 
+            else begin
+                hand_shake <= 1'b0;
+            end
         end
     end
-end
 
 endmodule
 
@@ -62,27 +62,27 @@ module gpio_i#(
     input [WIDTH-1:0] gpi
 );
 
-reg [WIDTH-1:0] buff=DEFAULT_VALUE;
-assign rdata = buff;
+    reg [WIDTH-1:0] buff=DEFAULT_VALUE;
+    assign rdata = buff;
 
-reg hand_shake=1'b0;
-assign ready = valid & hand_shake;
+    reg hand_shake=1'b0;
+    assign ready = valid & hand_shake;
 
-always @(posedge clk or negedge reset_n) begin
-    if (!reset_n) begin
-        hand_shake <= 1'b0;
-        buff <= DEFAULT_VALUE;
-    end
-    else begin
-        if (valid) begin
-            hand_shake <= 1'b1;
-            buff <= gpi;
+    always @(posedge clk or negedge reset_n) begin
+        if (!reset_n) begin
+            hand_shake <= 1'b0;
+            buff <= DEFAULT_VALUE;
         end
         else begin
-            hand_shake <= 1'b0;
+            if (valid) begin
+                hand_shake <= 1'b1;
+                buff <= gpi;
+            end
+            else begin
+                hand_shake <= 1'b0;
+            end
         end
     end
-end
 
 endmodule
 

@@ -28,7 +28,7 @@ module vigna_axi_adapter (
 	output        mem_axi_rready,
 	input  [31:0] mem_axi_rdata,
 
-	// Native PicoRV32 memory interface
+	// Native memory interface
 
 	input         mem_valid,
 	input         mem_instr,
