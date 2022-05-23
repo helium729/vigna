@@ -12,7 +12,7 @@
 // Dependencies: none
 // 
 // Revision: 
-// Revision 1.05 - fix jal bug
+// Revision 1.07 
 // Additional Comments:
 // 
 //////////////////////////////////////////////////////////////////////////////////
@@ -271,6 +271,7 @@ assign pc_next = ex_branch ? (dr[0] ? branch_addr : pc + 32'd4) : ex_jump ? dr :
 
 reg write_mem;
 
+//part2. executon unit
 always @ (posedge clk) begin
     //reset logic
     if (!resetn) begin
