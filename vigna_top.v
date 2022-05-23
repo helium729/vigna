@@ -7,12 +7,12 @@ module vigna_top#(
     input clk,
     input resetn,
 
-    output        valid,
-    input         ready,
-    output [31:0] addr,
-    input  [31:0] rdata,
-    output [31:0] wdata,
-    output [ 3:0] wstrb
+    output        m_valid,
+    input         m_ready,
+    output [31:0] m_addr,
+    input  [31:0] m_rdata,
+    output [31:0] m_wdata,
+    output [ 3:0] m_wstrb
     );
 
 wire i_valid;
@@ -66,12 +66,12 @@ bus2to1 b21(
     .m2_rdata(d_rdata),
     .m2_wdata(d_wdata),
     .m2_wstrb(d_wstrb),
-    .s_valid(valid),
-    .s_ready(ready),
-    .s_addr(addr),
-    .s_rdata(rdata),
-    .s_wdata(wdata),
-    .s_wstrb(wstrb)
+    .s_valid(m_valid),
+    .s_ready(m_ready),
+    .s_addr(m_addr),
+    .s_rdata(m_rdata),
+    .s_wdata(m_wdata),
+    .s_wstrb(m_wstrb)
     );
     
 
