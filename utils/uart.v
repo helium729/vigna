@@ -14,7 +14,7 @@ module uartlite #(
     input  [ 4:0] s_wstrb,
 
     input  wire uart_rxd,
-    output wire uart_txd
+    output reg  uart_txd
 );
 
     reg [7:0] r_fifo  [31:0];
@@ -94,16 +94,13 @@ module uartlite #(
             else if (r_state == 2'b11) begin 
                 if (r_counter == (CLK_FREQ/BAUD_RATE)) begin
                     r_counter <= 0;
-                end
-                else r_counter <= r_counter + 1;
-
-                if (r_counter == (CLK_FREQ/BAUD_RATE)/2) begin
                     if (r_bit_count < 8) r_temp_data[r_bit_count] <= uart_rxd;
                     if (r_bit_count == 9) begin
                         r_state <= 2'b10;
                     end
                     r_bit_count <= r_bit_count + 1;
                 end
+                else r_counter <= r_counter + 1;
             end
             else if (r_state == 2'b10) begin 
                 if (!r_fifo_full) begin
@@ -118,8 +115,43 @@ module uartlite #(
 
     //transmit state machine
     reg [1:0] t_state;
-
-    //ToDo
+    reg [31:0] t_counter;
+    reg [3:0] t_bit_count;
+    wire [7:0] t_temp_data;
+    assign t_temp_data = t_fifo_empty ? 8'b0 : t_fifo[t_fifo_tail_pointer];
+    always @ (posedge clk) begin
+        if (!resetn) begin
+            uart_txd <= 1'b1;
+            t_state <= 2'b00;
+            t_counter <= 0;
+            t_fifo_tail_pointer <= 0;
+        end
+        else begin
+            if (t_state == 2'b00) begin
+                if (!t_fifo_empty) begin
+                    t_state <= 2'b01;
+                    t_counter <= 0;
+                    uart_txd <= 1'b0;
+                end
+                else
+                    uart_txd <= 1'b1;
+            end
+            else if (t_state == 2'b01) begin
+                if (t_counter == (CLK_FREQ/BAUD_RATE)) begin
+                    t_counter <= 0;
+                    if (t_bit_count < 8) uart_txd <= t_temp_data[t_bit_count];
+                    if (t_bit_count == 8) begin
+                        t_state <= 2'b11;
+                        t_fifo_tail_pointer <= t_fifo_tail_pointer + 1;
+                        uart_txd <= 1'b1;
+                    end
+                    t_bit_count <= t_bit_count + 1;
+                end
+                else t_counter <= t_counter + 1;
+            end
+        end
+    end
+    
 
     
 endmodule
