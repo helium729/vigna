@@ -193,7 +193,7 @@ assign is_illegal = !(is_add || is_sub || is_sll || is_slt || is_sltu || is_xor 
 
 
 //cpu regs
-reg [31:0] cpu_regs[31:0];
+reg [31:0] cpu_regs[31:1];
 //rs from reg
 wire [31:0] rs1_val;
 assign rs1_val = rs1 == 0 ? 32'd0 : cpu_regs[rs1];
