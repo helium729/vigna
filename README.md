@@ -4,7 +4,7 @@ Vigna is a CPU core that implements [RISC-V RV32I Instruction Set](http://riscv.
 
 Tools (gcc, binutils, etc..) can be obtained via the [RISC-V Website](https://riscv.org/software-status/)
 
-The current version is v1.05
+The current version is v1.07
 
 **Warning: This project is not fully tested yet, please use with caution in the real world!**
 
@@ -18,7 +18,7 @@ The current version is v1.05
 - [Features and Typical Applications](#features-and-typical-applications)
 - [Files in this Repository](#files-in-this-repository)
 - [Memory Interface](#memory-interface)
-- [Evaluation](#evaluation)
+- [Design Details](#design-details)
 - [Future Plans](#future-plans)
 
 Features and Typical Applications
@@ -43,14 +43,24 @@ This Verilog file contains module `vigna_top`, which is a wrapper of vigna core.
 This directory contains MISC files for adaptions on different platforms.
 Design files including gpio and AXI4-Lite adapters are in this directory.
 
-##### bus2to1.v
-This Verilog file contains a module that merge 2 bus interfaces into one. This module uses a simple RS-latch logic. It is possible that warnings mignt occure when using linters like verilator or when synthesizing using yosys, but it should workout fine on FPGAs. If it turned out to be an error that cannot be solved, try fixing this by replacing the RS-latch logic with primitives.
 
 ##### axi_adapter
 This Verilog file contains a module that adapts current bus into an AXI4-Lite bus interface. This adapter can be used with module vigna or vigna_top.
 
-#### isa_tests
-This folder only exists in branch test. This folder contains ISA unit test files from https://github.com/riscv/riscv-tests/tree/master/isa/rv32ui 
+##### bus2to1.v
+This Verilog file contains a module that merge 2 bus interfaces into one. This module uses a simple RS-latch logic. It is possible that warnings mignt occure when using linters like verilator or when synthesizing using yosys, but it should workout fine on FPGAs. If it turned out to be an error that cannot be solved, try fixing this by replacing the RS-latch logic with primitives.
+
+#### bus1to2.v
+A bus routing module that decide which way the bus signals should go with the accessing address. This module is recommanded to connect multiple slave devices and MMIOs.
+
+#### gpio.v
+GPIOs based on the native bus.
+
+#### timer.v
+Module to get cycles(in 64-bits) after reset.
+
+#### uart.v
+The uart module for a 2-wire uart interface with a simple fifo buffer. Not finished yet.
 
 Memory Interface
 -----------------
@@ -84,13 +94,13 @@ write lower 16 bits, or write a single byte.
 There is no need for an external wait cycle. The memory can acknowledge the
 write immediately  with `ready` going high in the same cycle as `valid`.
 
-Evaluation
-----------
-//ToDo
+For more examples and explainations, goto [wiki](https://github.com/helium729/vigna/wiki).
+
+Design Details
+------------
+See the [wiki](https://github.com/helium729/vigna/wiki) for details in the design.
 
 Future Plans
 ---------
 Current: more tests and debugging.
 Next: more documentation about design details.
-
-//ToDo
