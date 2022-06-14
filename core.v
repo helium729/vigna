@@ -109,6 +109,10 @@ assign rd     = inst[11:7];
 assign rs1    = inst[19:15];
 assign rs2    = inst[24:20];
 
+wire funct7_zero, funct7_sub_sra;
+assign funct7_zero = funct7 == 0;
+assign funct7_sub_sra = funct7 == 7'b0100000;
+
 wire r_type, i_type, s_type, u_type, b_type, j_type;
 assign r_type = opcode == 7'b0110011;
 assign i_type = opcode == 7'b0010011 || opcode == 7'b0000011 || opcode == 7'b1100111;
@@ -130,16 +134,16 @@ assign shamt = inst[24:20];
 
 //r type
 wire is_add, is_sub, is_sll, is_slt, is_sltu, is_xor, is_srl, is_sra, is_or, is_and;
-assign is_add  = funct3 == 3'b000 && funct7 == 7'b0000000 && r_type;
-assign is_sub  = funct3 == 3'b000 && funct7 == 7'b0100000 && r_type;
-assign is_sll  = funct3 == 3'b001 && r_type;
-assign is_slt  = funct3 == 3'b010 && r_type;
-assign is_sltu = funct3 == 3'b011 && r_type;
-assign is_xor  = funct3 == 3'b100 && r_type;
-assign is_srl  = funct3 == 3'b101 && funct7 == 7'b0000000 && r_type;
-assign is_sra  = funct3 == 3'b101 && funct7 == 7'b0100000 && r_type;
-assign is_or   = funct3 == 3'b110 && r_type;
-assign is_and  = funct3 == 3'b111 && r_type;
+assign is_add  = funct3 == 3'b000 && funct7_zero    && r_type;
+assign is_sub  = funct3 == 3'b000 && funct7_sub_sra && r_type;
+assign is_sll  = funct3 == 3'b001 && funct7_zero    && r_type;
+assign is_slt  = funct3 == 3'b010 && funct7_zero    && r_type;
+assign is_sltu = funct3 == 3'b011 && funct7_zero    && r_type;
+assign is_xor  = funct3 == 3'b100 && funct7_zero    && r_type;
+assign is_srl  = funct3 == 3'b101 && funct7_zero    && r_type;
+assign is_sra  = funct3 == 3'b101 && funct7_zero    && r_type;
+assign is_or   = funct3 == 3'b110 && funct7_zero    && r_type;
+assign is_and  = funct3 == 3'b111 && funct7_zero    && r_type;
 
 //i type
 wire is_addi, is_slli, is_slti, is_sltiu, is_xori, is_srli, is_srai, is_ori, is_andi;
@@ -214,7 +218,7 @@ assign op2 = r_type || b_type   ? rs2_val :
              i_imm; 
 
 //backend state
-reg [2:0] exec_state;
+reg [3:0] exec_state;
 
 //source reg
 reg [31:0] d1, d2, d3;
@@ -254,18 +258,11 @@ assign dr =
 //branch addr and return addr
 reg [31:0] branch_addr, return_addr;
 
-wire ex_branch;
-wire ex_jump;
-wire ex_calc;
-wire ex_ls;
+reg ex_branch;
+reg ex_jump;
 reg [3:0] ex_type;
 reg [3:0] ls_strb;
 reg ls_sign_extend;
-
-assign ex_branch = ex_type[0];
-assign ex_jump = ex_type[1];
-assign ex_calc = ex_type[2];
-assign ex_ls = ex_type[3];
 
 assign pc_next = ex_branch ? (dr[0] ? branch_addr : pc + 32'd4) : ex_jump ? dr : pc + 32'd4;
 
@@ -285,7 +282,8 @@ always @ (posedge clk) begin
         exec_state     <= 0;
         fetch_recieved <= 0;
         wb_reg         <= 0;
-        ex_type        <= 0;
+        ex_jump        <= 0;
+        ex_branch      <= 0;
         branch_addr    <= 0;
         return_addr    <= 0;
         write_mem      <= 0;
@@ -296,7 +294,6 @@ always @ (posedge clk) begin
         case (exec_state)
             0: begin
                 if (fetched) begin
-                    exec_state <= 1;
                     d1 <= op1;
                     d2 <= op2;
                     if (s_type) begin
@@ -314,9 +311,12 @@ always @ (posedge clk) begin
                     end
                     branch_addr <= inst_addr + b_imm;
                     return_addr <= inst_addr + 32'd4;
-                    ex_type     <= {is_load || s_type, r_type || (i_type & !is_load & !is_jalr) || u_type, is_jal || is_jalr, b_type};
+                    ex_branch   <= b_type;
+                    ex_jump     <= is_jal || is_jalr;
+
+                    //next state logic
                     if (is_load || s_type) begin
-                        exec_state <= 1;
+                        exec_state <= 4'b0001;
                         if (!is_load) begin
                             write_mem <= 1;
                         end else begin
@@ -324,14 +324,18 @@ always @ (posedge clk) begin
                         end
                     end
                     else if (r_type || (i_type & !is_load & !is_jalr) || u_type || is_illegal) begin
-                        exec_state <= 2;
+                        exec_state <= 4'b0010;
                     end
                     else if (is_jal || is_jalr) begin
-                        exec_state <= 3;
+                        exec_state <= 4'b0100;
                     end
                     else if (b_type) begin
-                        exec_state <= 4;
+                        exec_state <= 4'b1000;
                     end
+                    else begin
+                        exec_state <= 4'b0000;
+                    end
+
                     //set strobe
                     if (is_lw || is_sw) ls_strb <= 4'b1111;
                     else if (is_lh || is_lhu || is_sh) ls_strb <= 4'b0011;
@@ -342,24 +346,24 @@ always @ (posedge clk) begin
                 end
                 
             end
-            1: begin
+            4'b0001: begin
                 fetch_recieved <= 0;
                 //load/store func
                 if (!write_mem) begin
                     d_valid    <= 1;
                     d_addr     <= dr;
                     d_wstrb    <= 0;
-                    exec_state <= 5;
+                    exec_state <= 4'b0011;
                 end else begin
                     d_valid    <= 1;
                     d_addr     <= dr;
                     d_wdata    <= d3;
                     d_wstrb    <= ls_strb;
-                    exec_state <= 6;
+                    exec_state <= 4'b0101;
                 end
 
             end
-            2: begin
+            4'b0010: begin
                 //calc func
                 exec_state <= 0;
                 if (wb_reg != 0) begin
@@ -367,7 +371,7 @@ always @ (posedge clk) begin
                 end
                 fetch_recieved <= 0;
             end
-            3: begin
+            4'b0100: begin
                 //jump func
                 exec_state <= 0;
                 if (wb_reg != 0) begin
@@ -375,12 +379,12 @@ always @ (posedge clk) begin
                 end
                 fetch_recieved <= 0;
             end
-            4: begin
+            4'b1000: begin
                 //branch func
                 exec_state     <= 0;
                 fetch_recieved <= 0;
             end
-            5: begin
+            4'b0011: begin
                 //load wait stage
                 if (d_ready) begin
                     exec_state <= 0;
@@ -394,7 +398,7 @@ always @ (posedge clk) begin
                 end
                 fetch_recieved <= 0;
             end
-            6: begin
+            4'b0101: begin
                 //store wait stage
                 if (d_ready) begin
                     exec_state <= 0;
