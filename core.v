@@ -231,8 +231,8 @@ reg [4:0] wb_reg;
 
 //nums for signed compare
 wire [32:0] sd1, sd2;
-assign sd1 = d1 + 33'b0_1000_0000_0000_0000_0000_0000_0000_0000;
-assign sd2 = d2 + 33'b0_1000_0000_0000_0000_0000_0000_0000_0000;
+assign sd1 = {d1[32:31] + 2'b01, d1[30:0]};
+assign sd2 = {d2[32:31] + 2'b01, d2[30:0]};
 
 //alu comb logic
 assign dr = 
