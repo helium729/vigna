@@ -12,7 +12,7 @@
 // Dependencies: none
 // 
 // Revision: 
-// Revision 1.07 
+// Revision 1.09
 // Additional Comments:
 // 
 //////////////////////////////////////////////////////////////////////////////////
@@ -29,8 +29,6 @@ module vigna#(
     input             i_ready,
     output     [31:0] i_addr,
     input      [31:0] i_rdata,
-    output     [31:0] i_wdata,
-    output     [ 3:0] i_wstrb,
 
     output reg        d_valid,
     input             d_ready,
@@ -39,9 +37,6 @@ module vigna#(
     output reg [31:0] d_wdata,
     output reg [ 3:0] d_wstrb
 );
-
-assign i_wdata = 32'h0;
-assign i_wstrb = 4'h0;
 
 //program counter
 reg  [31:0] pc;
@@ -109,15 +104,36 @@ assign rd     = inst[11:7];
 assign rs1    = inst[19:15];
 assign rs2    = inst[24:20];
 
+//r
+wire is_add, is_sub, is_sll, is_slt, is_sltu, is_xor, is_srl, is_sra, is_or, is_and;
+//i
+wire is_addi, is_slli, is_slti, is_sltiu, is_xori, is_srli, is_srai, is_ori, is_andi;
+wire is_jalr, is_lb, is_lh, is_lw, is_lbu, is_lhu;
+//s
+wire is_sb, is_sh, is_sw;
+//b
+wire is_beq, is_bne, is_blt, is_bge, is_bltu, is_bgeu;
+//u
+wire is_lui, is_auipc;
+//j
+wire is_jal;
+
+wire is_illegal;
+
 wire funct7_zero, funct7_sub_sra;
 assign funct7_zero = funct7 == 0;
 assign funct7_sub_sra = funct7 == 7'b0100000;
 
+wire i_type_alu, i_type_jalr, i_type_load;
+assign i_type_alu  = opcode == 7'b0010011;
+assign i_type_jalr = opcode == 7'b1100111;
+assign i_type_load = opcode == 7'b0000011;
+
 wire r_type, i_type, s_type, u_type, b_type, j_type;
 assign r_type = opcode == 7'b0110011;
-assign i_type = opcode == 7'b0010011 || opcode == 7'b0000011 || opcode == 7'b1100111;
+assign i_type = i_type_alu || i_type_jalr || i_type_load;
 assign s_type = opcode == 7'b0100011;
-assign u_type = opcode == 7'b0110111 || opcode == 7'b0010111;
+assign u_type = is_lui || is_auipc;
 assign b_type = opcode == 7'b1100011;
 assign j_type = opcode == 7'b1101111;
 
@@ -133,7 +149,6 @@ wire [4:0] shamt;
 assign shamt = inst[24:20];
 
 //r type
-wire is_add, is_sub, is_sll, is_slt, is_sltu, is_xor, is_srl, is_sra, is_or, is_and;
 assign is_add  = funct3 == 3'b000 && funct7_zero    && r_type;
 assign is_sub  = funct3 == 3'b000 && funct7_sub_sra && r_type;
 assign is_sll  = funct3 == 3'b001 && funct7_zero    && r_type;
@@ -146,35 +161,31 @@ assign is_or   = funct3 == 3'b110 && funct7_zero    && r_type;
 assign is_and  = funct3 == 3'b111 && funct7_zero    && r_type;
 
 //i type
-wire is_addi, is_slli, is_slti, is_sltiu, is_xori, is_srli, is_srai, is_ori, is_andi;
-wire is_jalr, is_lb, is_lh, is_lw, is_lbu, is_lhu;
-assign is_addi  = opcode == 7'b0010011 && funct3 == 3'b000 && i_type;
-assign is_slli  = opcode == 7'b0010011 && funct3 == 3'b001 && i_type;
-assign is_slti  = opcode == 7'b0010011 && funct3 == 3'b010 && i_type;
-assign is_sltiu = opcode == 7'b0010011 && funct3 == 3'b011 && i_type;
-assign is_xori  = opcode == 7'b0010011 && funct3 == 3'b100 && i_type;
-assign is_srli  = opcode == 7'b0010011 && funct3 == 3'b101 && i_type && funct7 == 7'b0000000;
-assign is_srai  = opcode == 7'b0010011 && funct3 == 3'b101 && i_type && funct7 == 7'b0100000;
-assign is_ori   = opcode == 7'b0010011 && funct3 == 3'b110 && i_type;
-assign is_andi  = opcode == 7'b0010011 && funct3 == 3'b111 && i_type;
-assign is_jalr  = opcode == 7'b1100111 && funct3 == 3'b000 && i_type;
-assign is_lb    = opcode == 7'b0000011 && funct3 == 3'b000 && i_type;
-assign is_lh    = opcode == 7'b0000011 && funct3 == 3'b001 && i_type;
-assign is_lw    = opcode == 7'b0000011 && funct3 == 3'b010 && i_type;
-assign is_lbu   = opcode == 7'b0000011 && funct3 == 3'b100 && i_type;
-assign is_lhu   = opcode == 7'b0000011 && funct3 == 3'b101 && i_type;
+assign is_addi  = i_type_alu  && funct3 == 3'b000;
+assign is_slli  = i_type_alu  && funct3 == 3'b001;
+assign is_slti  = i_type_alu  && funct3 == 3'b010;
+assign is_sltiu = i_type_alu  && funct3 == 3'b011;
+assign is_xori  = i_type_alu  && funct3 == 3'b100;
+assign is_srli  = i_type_alu  && funct3 == 3'b101 && funct7_zero;
+assign is_srai  = i_type_alu  && funct3 == 3'b101 && funct7_sub_sra;
+assign is_ori   = i_type_alu  && funct3 == 3'b110;
+assign is_andi  = i_type_alu  && funct3 == 3'b111;
+assign is_jalr  = i_type_jalr && funct3 == 3'b000;
+assign is_lb    = i_type_load && funct3 == 3'b000;
+assign is_lh    = i_type_load && funct3 == 3'b001;
+assign is_lw    = i_type_load && funct3 == 3'b010;
+assign is_lbu   = i_type_load && funct3 == 3'b100;
+assign is_lhu   = i_type_load && funct3 == 3'b101;
 
 wire is_load;
 assign is_load = is_lb || is_lh || is_lw || is_lbu || is_lhu;
 
 //s type
-wire is_sb, is_sh, is_sw;
 assign is_sb = funct3 == 3'b000 && s_type;
 assign is_sh = funct3 == 3'b001 && s_type;
 assign is_sw = funct3 == 3'b010 && s_type;
 
 //b type
-wire is_beq, is_bne, is_blt, is_bge, is_bltu, is_bgeu;
 assign is_beq  = funct3 == 3'b000 && b_type;
 assign is_bne  = funct3 == 3'b001 && b_type;
 assign is_blt  = funct3 == 3'b100 && b_type;
@@ -183,16 +194,13 @@ assign is_bltu = funct3 == 3'b110 && b_type;
 assign is_bgeu = funct3 == 3'b111 && b_type;
 
 //u type
-wire is_lui, is_auipc;
-assign is_lui   = opcode == 7'b0110111 && u_type;
-assign is_auipc = opcode == 7'b0010111 && u_type;
+assign is_lui   = opcode == 7'b0110111;
+assign is_auipc = opcode == 7'b0010111;
 
 //j type
-wire is_jal;
 assign is_jal = j_type;
 
 //illegal instruction
-wire is_illegal;
 assign is_illegal = !(is_add || is_sub || is_sll || is_slt || is_sltu || is_xor || is_srl || is_sra || is_or || is_and || is_addi || is_slli || is_slti || is_sltiu || is_xori || is_srli || is_srai || is_ori || is_andi || is_jalr || is_lb || is_lh || is_lw || is_lbu || is_lhu || is_sb || is_sh || is_sw || is_beq || is_bne || is_blt || is_bge || is_bltu || is_bgeu || is_lui || is_auipc || is_jal);
 
 
@@ -230,9 +238,9 @@ wire [31:0] dr;
 reg [4:0] wb_reg;
 
 //nums for signed compare
-wire [32:0] sd1, sd2;
-assign sd1 = {d1[32:31] + 2'b01, d1[30:0]};
-assign sd2 = {d2[32:31] + 2'b01, d2[30:0]};
+wire [31:0] sd1, sd2;
+assign sd1 = {~d1[31], d1[30:0]};
+assign sd2 = {~d2[31], d2[30:0]};
 
 //alu comb logic
 assign dr = 
@@ -252,11 +260,8 @@ assign dr =
     is_blt                          ? (sd1[31:0] < sd2[31:0] ? 32'd1 : 32'd0) : 
     is_bge                          ? (sd1[31:0] >= sd2[31:0] ? 32'd1 : 32'd0) : 
     is_bltu                         ? (d1 < d2 ? 32'd1 : 32'd0) : 
-    is_bgeu                         ? (d1 >= d2 ? 32'd1 : 32'd0) :
-    is_illegal                      ? 32'd0 : 32'd0;
+    is_bgeu                         ? (d1 >= d2 ? 32'd1 : 32'd0) : 32'd0;
 
-//branch addr and return addr
-reg [31:0] branch_addr, return_addr;
 
 reg ex_branch;
 reg ex_jump;
@@ -264,7 +269,7 @@ reg [3:0] ex_type;
 reg [3:0] ls_strb;
 reg ls_sign_extend;
 
-assign pc_next = ex_branch ? (dr[0] ? branch_addr : pc + 32'd4) : ex_jump ? dr : pc + 32'd4;
+assign pc_next = ex_branch ? (dr[0] ? d3 : pc + 32'd4) : ex_jump ? dr : pc + 32'd4;
 
 reg write_mem;
 
@@ -284,8 +289,6 @@ always @ (posedge clk) begin
         wb_reg         <= 0;
         ex_jump        <= 0;
         ex_branch      <= 0;
-        branch_addr    <= 0;
-        return_addr    <= 0;
         write_mem      <= 0;
         ls_strb        <= 0;
         ls_sign_extend <= 0;
@@ -298,8 +301,10 @@ always @ (posedge clk) begin
                     d2 <= op2;
                     if (s_type) begin
                         d3 <= rs2_val;
-                    end else begin
-                        d3 <= 0;
+                    end else if (b_type) begin
+                        d3 <= inst_addr + b_imm;
+                    end else if (is_jal || is_jalr) begin
+                        d3 <= inst_addr + 32'd4;
                     end
                 
                     fetch_recieved <= 1;
@@ -309,8 +314,6 @@ always @ (posedge clk) begin
                     end else begin
                         wb_reg <= 0;
                     end
-                    branch_addr <= inst_addr + b_imm;
-                    return_addr <= inst_addr + 32'd4;
                     ex_branch   <= b_type;
                     ex_jump     <= is_jal || is_jalr;
 
@@ -375,7 +378,7 @@ always @ (posedge clk) begin
                 //jump func
                 exec_state <= 0;
                 if (wb_reg != 0) begin
-                    cpu_regs[wb_reg] <= return_addr;
+                    cpu_regs[wb_reg] <= d3;
                 end
                 fetch_recieved <= 0;
             end
@@ -415,6 +418,5 @@ always @ (posedge clk) begin
         endcase
     end
 end
-
 
 endmodule

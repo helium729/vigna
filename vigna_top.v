@@ -19,8 +19,6 @@ wire i_valid;
 wire i_ready;
 wire [31:0] i_addr;
 wire [31:0] i_rdata;
-wire [31:0] i_wdata;
-wire [3:0] i_wstrb;
 
 wire d_valid;
 wire d_ready;
@@ -40,8 +38,6 @@ vigna #(
     .i_ready(i_ready),
     .i_addr(i_addr),
     .i_rdata(i_rdata),
-    .i_wdata(i_wdata),
-    .i_wstrb(i_wstrb),
     .d_valid(d_valid),
     .d_ready(d_ready),
     .d_addr(d_addr),
@@ -58,8 +54,8 @@ bus2to1 b21(
     .m1_ready(i_ready),
     .m1_addr(i_addr),
     .m1_rdata(i_rdata),
-    .m1_wdata(i_wdata),
-    .m1_wstrb(i_wstrb),
+    .m1_wdata(32'd0),
+    .m1_wstrb(4'd0),
     .m2_valid(d_valid),
     .m2_ready(d_ready),
     .m2_addr(d_addr),
