@@ -1,4 +1,3 @@
-`timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
 // Company: Wuhan University
 // Engineer: Xuanyu Hu
@@ -17,11 +16,14 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
+`ifndef VIGNA_CORE_V 
+`define VIGNA_CORE_V
+
+`timescale 1ns / 1ps
+`include "vigna_conf.vh"
 
 //vigna top module
-module vigna#(
-    parameter RESET_ADDR = 32'h0000_0000
-    )(
+module vigna(
     input clk,
     input resetn,
 
@@ -58,7 +60,7 @@ assign i_addr = pc;
 always @ (posedge clk) begin
     //reset logic
     if (!resetn) begin
-        pc          <= RESET_ADDR;
+        pc          <= `VIGNA_CORE_RESET_ADDR;
         fetch_state <= 0;
         i_valid     <= 0;
     end else begin
@@ -292,6 +294,9 @@ always @ (posedge clk) begin
         write_mem      <= 0;
         ls_strb        <= 0;
         ls_sign_extend <= 0;
+        `ifdef VIGNA_CORE_STACK_ADDR_RESET_ENABLE
+            cpu_regs[2] <= `VIGNA_CORE_STACK_ADDR_RESET_VALUE;
+        `endif
     end else begin
         //state machine
         case (exec_state)
@@ -419,4 +424,7 @@ always @ (posedge clk) begin
     end
 end
 
+
 endmodule
+
+`endif

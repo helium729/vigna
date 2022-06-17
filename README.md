@@ -32,11 +32,14 @@ Files in this Repository
 #### README.md
 You are reading it right now.
 
-#### core.v
-This Verilog file contains module `vigna`, which is the design rtl code of the core. The module in this file has separated instruction bus and data bus. The argument RESET_ADDR indicates the reset address on reset.
+#### vigna_core.v
+This Verilog file contains module `vigna`, which is the design rtl code of the core.
 
 #### vigna_top.v
-This Verilog file contains module `vigna_top`, which is a wrapper of vigna core. The interface of vigna_top only contains one 32-bit bus.
+This Verilog file contains module `vigna_top`, which is a wrapper of vigna core.
+
+#### vigna_conf.v
+This Verilog file defines the configurations of core vigna.
 
 
 #### Utils
