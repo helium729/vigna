@@ -105,5 +105,5 @@ See the [wiki](https://github.com/helium729/vigna/wiki) for details in the desig
 
 Future Plans
 ---------
-Current: more tests and debugging.
+Current: add configurations on E extension and M extension
 Next: more documentation about design details.
