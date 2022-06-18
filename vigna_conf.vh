@@ -1,6 +1,13 @@
 `ifndef VIGNA_CONF_VH
 `define VIGNA_CONF_VH
 
+
+/* ------------------------------------------------------------------------- */
+
+/* enabling E extension
+ * which disables x16-x32 support */
+//`define VIGNA_CORE_E_EXTENSION
+
 /* ------------------------------------------------------------------------- */
 
 /* bus binding option

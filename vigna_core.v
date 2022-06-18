@@ -205,15 +205,23 @@ assign is_jal = j_type;
 //illegal instruction
 assign is_illegal = !(is_add || is_sub || is_sll || is_slt || is_sltu || is_xor || is_srl || is_sra || is_or || is_and || is_addi || is_slli || is_slti || is_sltiu || is_xori || is_srli || is_srai || is_ori || is_andi || is_jalr || is_lb || is_lh || is_lw || is_lbu || is_lhu || is_sb || is_sh || is_sw || is_beq || is_bne || is_blt || is_bge || is_bltu || is_bgeu || is_lui || is_auipc || is_jal);
 
-
-//cpu regs
-reg [31:0] cpu_regs[31:1];
-//rs from reg
+//rs1 from reg
 wire [31:0] rs1_val;
-assign rs1_val = rs1 == 0 ? 32'd0 : cpu_regs[rs1];
 //rs2 from reg
 wire [31:0] rs2_val;
-assign rs2_val = rs2 == 0 ? 32'd0 : cpu_regs[rs2];
+
+//cpu regs
+`ifdef VIGNA_CORE_E_EXTENSION
+    reg [31:0] cpu_regs[15:1];
+    assign rs1_val = rs1 == 0 ? 32'd0 : cpu_regs[rs1[3:0]];
+    assign rs2_val = rs2 == 0 ? 32'd0 : cpu_regs[rs2[3:0]];
+`else
+    reg [31:0] cpu_regs[31:1];
+    assign rs1_val = rs1 == 0 ? 32'd0 : cpu_regs[rs1];
+    assign rs2_val = rs2 == 0 ? 32'd0 : cpu_regs[rs2];
+`endif
+
+
 
 
 wire [31:0] op1, op2;
@@ -237,7 +245,11 @@ reg [31:0] d1, d2, d3;
 wire [31:0] dr;
 
 //write back
-reg [4:0] wb_reg;
+`ifdef VIGNA_CORE_E_EXTENSION
+    reg [3:0] wb_reg;
+`else
+    reg [4:0] wb_reg;
+`endif 
 
 //nums for signed compare
 wire [31:0] sd1, sd2;
@@ -315,7 +327,11 @@ always @ (posedge clk) begin
                     fetch_recieved <= 1;
                     
                     if (u_type || j_type || i_type || r_type) begin
-                        wb_reg <= rd;
+                        `ifdef VIGNA_CORE_E_EXTENSION
+                            wb_reg <= rd[3:0];
+                        `else 
+                            wb_reg <= rd;
+                        `endif
                     end else begin
                         wb_reg <= 0;
                     end
@@ -352,7 +368,6 @@ always @ (posedge clk) begin
                     if (is_lw || is_lh || is_lb) ls_sign_extend <= 1;
                     else ls_sign_extend <= 0;
                 end
-                
             end
             4'b0001: begin
                 fetch_recieved <= 0;
@@ -369,7 +384,6 @@ always @ (posedge clk) begin
                     d_wstrb    <= ls_strb;
                     exec_state <= 4'b0101;
                 end
-
             end
             4'b0010: begin
                 //calc func
@@ -415,7 +429,6 @@ always @ (posedge clk) begin
                     d_wdata    <= 0;
                 end
                 fetch_recieved <= 0;
-
             end
             default: begin
                 exec_state <= 0;
