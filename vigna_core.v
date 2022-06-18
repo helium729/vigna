@@ -270,7 +270,7 @@ assign cmp_neg = add_result[32];
     assign is_shift = is_sll || is_slli || is_srl || is_srli || is_sra || is_srai;
     `ifdef VIGNA_CORE_TWO_STAGE_SHIFT
     wire first_shift_stage;
-    assign first_shift_stage = shift_cnt[5:2] != 0;
+    assign first_shift_stage = shift_cnt[4:2] != 0;
     `endif
 `endif
 
