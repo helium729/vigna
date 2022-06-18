@@ -120,8 +120,6 @@ wire is_lui, is_auipc;
 //j
 wire is_jal;
 
-wire is_illegal;
-
 wire funct7_zero, funct7_sub_sra;
 assign funct7_zero = funct7 == 0;
 assign funct7_sub_sra = funct7 == 7'b0100000;
@@ -139,13 +137,20 @@ assign u_type = is_lui || is_auipc;
 assign b_type = opcode == 7'b1100011;
 assign j_type = opcode == 7'b1101111;
 
-wire [31:0] i_imm, s_imm, b_imm, u_imm, j_imm;
-//always sign extend
-assign i_imm = {{20{inst[31]}}, inst[31:20]};
-assign s_imm = {{20{inst[31]}}, inst[31:25], inst[11:7]};
-assign b_imm = {{19{inst[31]}}, inst[31], inst[7], inst[30:25], inst[11:8], 1'b0};
-assign u_imm = {inst[31:12], 12'b0};
-assign j_imm = {{11{inst[31]}}, inst[31], inst[19:12], inst[20], inst[30:21], 1'b0};
+wire [31:0] imm;
+assign imm[31]    = inst[31];
+assign imm[30:20] = u_type           ? inst[30:20] : {11{inst[31]}};
+assign imm[19:12] = u_type || j_type ? inst[19:12] : {8{inst[31]}};
+assign imm[11]    = u_type           ? 1'b0 :
+                    j_type           ? inst[20] :
+                    b_type           ? inst[7] : inst[31];
+assign imm[10:5]  = u_type           ? 6'b000000 : inst[30:25];
+assign imm[4:1]   = u_type           ? 5'b00000 :
+                    u_type           ? 4'b0000 :
+                    i_type || j_type ? inst[24:21] : inst[11:8];
+assign imm[0]     = i_type           ? inst[20] :
+                    s_type           ? inst[7] : 1'b0;
+
 
 wire [4:0] shamt;
 assign shamt = inst[24:20];
@@ -202,9 +207,6 @@ assign is_auipc = opcode == 7'b0010111;
 //j type
 assign is_jal = j_type;
 
-//illegal instruction
-assign is_illegal = !(is_add || is_sub || is_sll || is_slt || is_sltu || is_xor || is_srl || is_sra || is_or || is_and || is_addi || is_slli || is_slti || is_sltiu || is_xori || is_srli || is_srai || is_ori || is_andi || is_jalr || is_lb || is_lh || is_lw || is_lbu || is_lhu || is_sb || is_sh || is_sw || is_beq || is_bne || is_blt || is_bge || is_bltu || is_bgeu || is_lui || is_auipc || is_jal);
-
 //rs1 from reg
 wire [31:0] rs1_val;
 //rs2 from reg
@@ -225,15 +227,11 @@ wire [31:0] rs2_val;
 
 
 wire [31:0] op1, op2;
-assign op1 = is_jal ? j_imm :
-             u_type ? u_imm :
-             rs1_val;
+assign op1 = is_jal || u_type ? imm : rs1_val;
 assign op2 = r_type || b_type   ? rs2_val :
-             s_type             ? s_imm :
              is_auipc || j_type ? inst_addr :
              is_slli || is_srli ? {27'b0, shamt} :
-             is_lui             ? 32'd0 :
-             i_imm; 
+             is_lui             ? 32'd0 : imm; 
 
 //backend state
 reg [3:0] exec_state;
@@ -251,30 +249,41 @@ wire [31:0] dr;
     reg [4:0] wb_reg;
 `endif 
 
-//nums for signed compare
-wire [31:0] sd1, sd2;
-assign sd1 = {~d1[31], d1[30:0]};
-assign sd2 = {~d2[31], d2[30:0]};
+wire sub_cmp;
+assign sub_cmp = is_slt || is_sltu || is_slti || is_sltiu || b_type || is_sub;
+
+//neg for sub
+wire [31:0] neg_d2;
+assign neg_d2 = ~d2 + 32'd1;
+
+wire unsigned_cmp;
+assign unsigned_cmp = is_sltu || is_sltiu || is_bltu || is_bgeu;
+
+wire [32:0] add_result;
+assign add_result = {unsigned_cmp ? 1'b0 : d1[31], d1}
+                    + unsigned_cmp ? ~{1'b0, d2} + 33'd1 : {d2[31] ^ sub_cmp, (sub_cmp ? neg_d2 : d2)};
+
+wire cmp_zero, cmp_neg;
+assign cmp_zero = add_result[31:0] == 32'd0;
+assign cmp_neg = add_result[32];
 
 //alu comb logic
 assign dr = 
     is_add || is_addi || is_jal || s_type
-    || is_jalr || is_load || u_type ? d1 + d2 :
-    is_sub                          ? d1 - d2 : 
+     || is_jalr || is_load || u_type
+     || is_sub                      ? add_result[31:0] : 
     is_sll || is_slli               ? d1 << d2 : 
-    is_slt || is_slti               ? (sd1[31:0] >= sd2[31:0] ? 32'd1 : 32'd0) : 
-    is_sltu || is_sltiu             ? (d1 < d2 ? 32'd1 : 32'd0) : 
+    is_slt || is_slti                
+     ||is_sltu || is_sltiu          ? {31'd0, cmp_neg} : 
     is_xor || is_xori               ? d1 ^ d2 : 
     is_srl || is_srli               ? d1 >> d2 : 
     is_sra || is_srai               ? d1 >>> d2 : 
     is_or || is_ori                 ? d1 | d2 : 
     is_and || is_andi               ? d1 & d2 : 
-    is_beq                          ? (d1 == d2 ? 32'd1 : 32'd0) : 
-    is_bne                          ? (d1 != d2 ? 32'd1 : 32'd0) : 
-    is_blt                          ? (sd1[31:0] < sd2[31:0] ? 32'd1 : 32'd0) : 
-    is_bge                          ? (sd1[31:0] >= sd2[31:0] ? 32'd1 : 32'd0) : 
-    is_bltu                         ? (d1 < d2 ? 32'd1 : 32'd0) : 
-    is_bgeu                         ? (d1 >= d2 ? 32'd1 : 32'd0) : 32'd0;
+    is_beq                          ? {31'd0, cmp_zero} : 
+    is_bne                          ? {31'd0, ~cmp_zero} : 
+    is_blt || is_bltu               ? {31'd0, cmp_neg} : 
+    is_bge || is_bgeu               ? {31'd0, ~cmp_neg} : 32'd0;
 
 
 reg ex_branch;
@@ -283,7 +292,8 @@ reg [3:0] ex_type;
 reg [3:0] ls_strb;
 reg ls_sign_extend;
 
-assign pc_next = ex_branch ? (dr[0] ? d3 : pc + 32'd4) : ex_jump ? dr : pc + 32'd4;
+assign pc_next =  ex_jump           ? dr :
+                  ex_branch & dr[0] ? d3 : pc + 32'd4;
 
 reg write_mem;
 
@@ -312,14 +322,14 @@ always @ (posedge clk) begin
     end else begin
         //state machine
         case (exec_state)
-            0: begin
+            4'b0000: begin
                 if (fetched) begin
                     d1 <= op1;
                     d2 <= op2;
                     if (s_type) begin
                         d3 <= rs2_val;
                     end else if (b_type) begin
-                        d3 <= inst_addr + b_imm;
+                        d3 <= inst_addr + imm;
                     end else if (is_jal || is_jalr) begin
                         d3 <= inst_addr + 32'd4;
                     end
@@ -341,14 +351,7 @@ always @ (posedge clk) begin
                     //next state logic
                     if (is_load || s_type) begin
                         exec_state <= 4'b0001;
-                        if (!is_load) begin
-                            write_mem <= 1;
-                        end else begin
-                            write_mem <= 0;
-                        end
-                    end
-                    else if (r_type || (i_type & !is_load & !is_jalr) || u_type || is_illegal) begin
-                        exec_state <= 4'b0010;
+                        write_mem <= is_load ? 1'b0 : 1'b1;
                     end
                     else if (is_jal || is_jalr) begin
                         exec_state <= 4'b0100;
@@ -357,7 +360,7 @@ always @ (posedge clk) begin
                         exec_state <= 4'b1000;
                     end
                     else begin
-                        exec_state <= 4'b0000;
+                        exec_state <= 4'b0010;
                     end
 
                     //set strobe
