@@ -6,7 +6,8 @@
 
 /* enabling E extension
  * which disables x16-x32 support */
-//`define VIGNA_CORE_E_EXTENSION
+ 
+`define VIGNA_CORE_E_EXTENSION
 
 /* ------------------------------------------------------------------------- */
 
