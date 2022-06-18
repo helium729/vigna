@@ -264,6 +264,16 @@ wire cmp_eq, cmp_neg;
 assign cmp_eq = d1 == d2;
 assign cmp_neg = add_result[32];
 
+`ifndef VIGNA_CORE_BARREL_SHIFTER
+    reg [4:0] shift_cnt;
+    wire is_shift;
+    assign is_shift = is_sll || is_slli || is_srl || is_srli || is_sra || is_srai;
+    `ifdef VIGNA_CORE_TWO_STAGE_SHIFT
+    wire first_shift_stage;
+    assign first_shift_stage = shift_cnt[5:2] != 0;
+    `endif
+`endif
+
 //alu comb logic
 assign dr = 
     is_add || is_addi || is_jal || s_type
@@ -283,9 +293,15 @@ assign dr =
     is_srl || is_srli               ? d1 >> d2[4:0] : 
     is_sra || is_srai               ? d1 >>> d2[4:0] : 32'd0;
 `else
+`ifdef VIGNA_CORE_TWO_STAGE_SHIFT
+    is_sll || is_slli               ? (first_shift_stage ? {d3[27:0], 4'b0000} : {d3[30:0], 1'b0}) :
+    is_srl || is_srli               ? (first_shift_stage ? {4'b0000, d3[31:4]} : {1'b0, d3[31:1]}) :
+    is_sra || is_srai               ? (first_shift_stage ? {4{d3[31]}, d3[31:4]} : {d3[31], d3[31:1]}) : 32'd0;
+`else 
     is_sll || is_slli               ? {d3[30:0], 1'b0} :
     is_srl || is_srli               ? {1'b0, d3[31:1]} :
     is_sra || is_srai               ? {d3[31], d3[31:1]} : 32'd0;
+`endif
 `endif
 
 
@@ -299,12 +315,6 @@ assign pc_next =  ex_jump           ? dr :
                   ex_branch & dr[0] ? d3 : pc + 32'd4;
 
 reg write_mem;
-
-`ifndef VIGNA_CORE_BARREL_SHIFTER
-    reg [4:0] shift_cnt;
-    wire is_shift;
-    assign is_shift = is_sll || is_slli || is_srl || is_srli || is_sra || is_srai;
-`endif
 
 //part2. executon unit
 always @ (posedge clk) begin
@@ -463,7 +473,12 @@ always @ (posedge clk) begin
                     exec_state <= 0;
                     cpu_regs[wb_reg] <= d3;
                 end else begin
-                    shift_cnt <= shift_cnt - 1;
+                    `ifdef VIGNA_CORE_TWO_STAGE_SHIFT
+                    if (first_shift_stage)
+                        shift_cnt <= shift_cnt - 4;
+                    else
+                    `endif
+                        shift_cnt <= shift_cnt - 1;
                     d3 <= dr;
                 end
             end 
