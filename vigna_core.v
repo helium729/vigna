@@ -296,7 +296,7 @@ assign dr =
 `ifdef VIGNA_CORE_TWO_STAGE_SHIFT
     is_sll || is_slli               ? (first_shift_stage ? {d3[27:0], 4'b0000} : {d3[30:0], 1'b0}) :
     is_srl || is_srli               ? (first_shift_stage ? {4'b0000, d3[31:4]} : {1'b0, d3[31:1]}) :
-    is_sra || is_srai               ? (first_shift_stage ? {4{d3[31]}, d3[31:4]} : {d3[31], d3[31:1]}) : 32'd0;
+    is_sra || is_srai               ? (first_shift_stage ? {{4{d3[31]}}, d3[31:4]} : {d3[31], d3[31:1]}) : 32'd0;
 `else 
     is_sll || is_slli               ? {d3[30:0], 1'b0} :
     is_srl || is_srli               ? {1'b0, d3[31:1]} :
