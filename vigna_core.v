@@ -223,9 +223,6 @@ wire [31:0] rs2_val;
     assign rs2_val = rs2 == 0 ? 32'd0 : cpu_regs[rs2];
 `endif
 
-
-
-
 wire [31:0] op1, op2;
 assign op1 = is_jal || u_type ? imm : rs1_val;
 assign op2 = r_type || b_type   ? rs2_val :
@@ -257,14 +254,14 @@ wire [31:0] neg_d2;
 assign neg_d2 = ~d2 + 32'd1;
 
 wire unsigned_cmp;
-assign unsigned_cmp = is_sltu || is_sltiu || is_bltu || is_bgeu;
+assign unsigned_lt = d1 < d2;
 
 wire [32:0] add_result;
-assign add_result = {unsigned_cmp ? 1'b0 : d1[31], d1}
-                    + unsigned_cmp ? ~{1'b0, d2} + 33'd1 : {d2[31] ^ sub_cmp, (sub_cmp ? neg_d2 : d2)};
+assign add_result = {d1[31], d1}
+                    + {d2[31] ^ sub_cmp, (sub_cmp ? neg_d2 : d2)};
 
-wire cmp_zero, cmp_neg;
-assign cmp_zero = add_result[31:0] == 32'd0;
+wire cmp_eq, cmp_neg;
+assign cmp_eq = d1 == d2;
 assign cmp_neg = add_result[32];
 
 //alu comb logic
@@ -272,18 +269,24 @@ assign dr =
     is_add || is_addi || is_jal || s_type
      || is_jalr || is_load || u_type
      || is_sub                      ? add_result[31:0] : 
-    is_sll || is_slli               ? d1 << d2 : 
-    is_slt || is_slti                
-     ||is_sltu || is_sltiu          ? {31'd0, cmp_neg} : 
-    is_xor || is_xori               ? d1 ^ d2 : 
-    is_srl || is_srli               ? d1 >> d2 : 
-    is_sra || is_srai               ? d1 >>> d2 : 
+    is_slt || is_slti               ? {31'd0, cmp_neg} :
+    is_sltu || is_sltiu             ? {31'd0, cmp_neg} : 
+    is_xor || is_xori               ? d1 ^ d2 :  
     is_or || is_ori                 ? d1 | d2 : 
     is_and || is_andi               ? d1 & d2 : 
-    is_beq                          ? {31'd0, cmp_zero} : 
-    is_bne                          ? {31'd0, ~cmp_zero} : 
-    is_blt || is_bltu               ? {31'd0, cmp_neg} : 
-    is_bge || is_bgeu               ? {31'd0, ~cmp_neg} : 32'd0;
+    is_beq                          ? {31'd0, cmp_eq} : 
+    is_bne                          ? {31'd0, ~cmp_eq} : 
+    is_blt || is_bltu               ? {31'd0, unsigned_lt} : 
+    is_bge || is_bgeu               ? {31'd0, ~unsigned_lt} :
+`ifdef VIGNA_CORE_BARREL_SHIFTER
+    is_sll || is_slli               ? d1 << d2[4:0] :
+    is_srl || is_srli               ? d1 >> d2[4:0] : 
+    is_sra || is_srai               ? d1 >>> d2[4:0] : 32'd0;
+`else
+    is_sll || is_slli               ? {d3[30:0], 1'b0} :
+    is_srl || is_srli               ? {1'b0, d3[31:1]} :
+    is_sra || is_srai               ? {d3[31], d3[31:1]} : 32'd0;
+`endif
 
 
 reg ex_branch;
@@ -296,6 +299,12 @@ assign pc_next =  ex_jump           ? dr :
                   ex_branch & dr[0] ? d3 : pc + 32'd4;
 
 reg write_mem;
+
+`ifndef VIGNA_CORE_BARREL_SHIFTER
+    reg [4:0] shift_cnt;
+    wire is_shift;
+    assign is_shift = is_sll || is_slli || is_srl || is_srli || is_sra || is_srai;
+`endif
 
 //part2. executon unit
 always @ (posedge clk) begin
@@ -319,6 +328,9 @@ always @ (posedge clk) begin
         `ifdef VIGNA_CORE_STACK_ADDR_RESET_ENABLE
             cpu_regs[2] <= `VIGNA_CORE_STACK_ADDR_RESET_VALUE;
         `endif
+        `ifndef VIGNA_CORE_BARREL_SHIFTER
+            shift_cnt <= 0;
+        `endif
     end else begin
         //state machine
         case (exec_state)
@@ -332,6 +344,10 @@ always @ (posedge clk) begin
                         d3 <= inst_addr + imm;
                     end else if (is_jal || is_jalr) begin
                         d3 <= inst_addr + 32'd4;
+                    `ifndef VIGNA_CORE_BARREL_SHIFTER
+                    end else if (is_shift) begin
+                        d3 <= op1;
+                    `endif 
                     end
                 
                     fetch_recieved <= 1;
@@ -359,6 +375,12 @@ always @ (posedge clk) begin
                     else if (b_type) begin
                         exec_state <= 4'b1000;
                     end
+                    `ifndef VIGNA_CORE_BARREL_SHIFTER
+                    else if (is_shift) begin
+                        shift_cnt <= op2[4:0];
+                        exec_state <= 4'b0110;
+                    end
+                    `endif
                     else begin
                         exec_state <= 4'b0010;
                     end
@@ -433,6 +455,19 @@ always @ (posedge clk) begin
                 end
                 fetch_recieved <= 0;
             end
+            `ifndef VIGNA_CORE_BARREL_SHIFTER
+            4'b0110: begin
+                //shift func
+                fetch_recieved <= 0;
+                if (shift_cnt == 0) begin
+                    exec_state <= 0;
+                    cpu_regs[wb_reg] <= d3;
+                end else begin
+                    shift_cnt <= shift_cnt - 1;
+                    d3 <= dr;
+                end
+            end 
+            `endif
             default: begin
                 exec_state <= 0;
             end

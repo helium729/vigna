@@ -33,4 +33,12 @@
 
 /* ------------------------------------------------------------------------- */
 
+/* shift instruction options 
+ * barrel shifter: finishing shift in one cycle
+ * two-stage shift: make shifts in 4 bits then 1 bit
+ * none: shift one bit per cycle*/
+
+ //`define VIGNA_CORE_BARREL_SHIFTER
+ //`define VIGNA_CORE_TWO_STAGE_SHIFT //ToDo
+
 `endif
