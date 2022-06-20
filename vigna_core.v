@@ -246,9 +246,6 @@ wire [31:0] dr;
     reg [4:0] wb_reg;
 `endif 
 
-//neg for sub
-wire [31:0] neg_d2;
-assign neg_d2 = ~d2 + 32'd1;
 
 wire cmp_eq;
 wire abs_lt;
@@ -260,7 +257,7 @@ assign signed_lt   = (d1[31] ^ d2[31]) ? d1[31] : abs_lt;
 assign unsigned_lt = (d1[31] ^ d2[31]) ? d2[31] : abs_lt;
 
 wire [31:0] add_result;
-assign add_result = d1 + (is_sub ? neg_d2 : d2);
+assign add_result = d1 + d2;
 
 `ifndef VIGNA_CORE_BARREL_SHIFTER
     reg [4:0] shift_cnt;
@@ -347,7 +344,7 @@ always @ (posedge clk) begin
             4'b0000: begin
                 if (fetched) begin
                     d1 <= op1;
-                    d2 <= op2;
+                    d2 <= (is_sub ? ~op2 + 32'd1 : op2);
                     if (s_type) begin
                         d3 <= rs2_val;
                     end else if (b_type) begin
