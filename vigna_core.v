@@ -258,7 +258,7 @@ assign unsigned_lt = d1 < d2;
 
 wire [32:0] add_result;
 assign add_result = {d1[31], d1}
-                    + {d2[31] ^ sub_cmp, (sub_cmp ? neg_d2 : d2)};
+                    + {(sub_cmp ? {neg_d2[31], neg_d2} : {d2[31], d2})};
 
 wire cmp_eq, cmp_neg;
 assign cmp_eq = d1 == d2;
@@ -279,15 +279,15 @@ assign dr =
     is_add || is_addi || is_jal || s_type
      || is_jalr || is_load || u_type
      || is_sub                      ? add_result[31:0] : 
-    is_slt || is_slti               ? {31'd0, cmp_neg} :
-    is_sltu || is_sltiu             ? {31'd0, cmp_neg} : 
+    is_slt || is_slti || is_blt     ? {31'd0, cmp_neg} :
+    is_bge                          ? {31'd0, ~cmp_neg} :
+    is_sltu || is_sltiu || is_bltu  ? {31'd0, unsigned_lt} : 
+    is_bgeu                         ? {31'd0, ~unsigned_lt} :
     is_xor || is_xori               ? d1 ^ d2 :  
     is_or || is_ori                 ? d1 | d2 : 
     is_and || is_andi               ? d1 & d2 : 
     is_beq                          ? {31'd0, cmp_eq} : 
     is_bne                          ? {31'd0, ~cmp_eq} : 
-    is_blt || is_bltu               ? {31'd0, unsigned_lt} : 
-    is_bge || is_bgeu               ? {31'd0, ~unsigned_lt} :
 `ifdef VIGNA_CORE_BARREL_SHIFTER
     is_sll || is_slli               ? d1 << d2[4:0] :
     is_srl || is_srli               ? d1 >> d2[4:0] : 
@@ -304,6 +304,8 @@ assign dr =
 `endif
 `endif
 
+wire [31:0] inst_add_result;
+assign inst_add_result = inst_addr + (b_type ? imm: 32'd4);
 
 reg ex_branch;
 reg ex_jump;
@@ -351,9 +353,9 @@ always @ (posedge clk) begin
                     if (s_type) begin
                         d3 <= rs2_val;
                     end else if (b_type) begin
-                        d3 <= inst_addr + imm;
+                        d3 <= inst_add_result;
                     end else if (is_jal || is_jalr) begin
-                        d3 <= inst_addr + 32'd4;
+                        d3 <= inst_add_result;
                     `ifndef VIGNA_CORE_BARREL_SHIFTER
                     end else if (is_shift) begin
                         d3 <= op1;
@@ -489,7 +491,6 @@ always @ (posedge clk) begin
         endcase
     end
 end
-
 
 endmodule
 
