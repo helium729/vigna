@@ -246,23 +246,21 @@ wire [31:0] dr;
     reg [4:0] wb_reg;
 `endif 
 
-wire sub_cmp;
-assign sub_cmp = is_slt || is_sltu || is_slti || is_sltiu || b_type || is_sub;
-
 //neg for sub
 wire [31:0] neg_d2;
 assign neg_d2 = ~d2 + 32'd1;
 
-wire unsigned_cmp;
-assign unsigned_lt = d1 < d2;
+wire cmp_eq;
+wire abs_lt;
+wire signed_lt;
+wire unsigned_lt;
+assign cmp_eq      = d1 == d2;
+assign abs_lt      = d1[30:0] < d2[30:0];
+assign signed_lt   = (d1[31] ^ d2[31]) ? d1[31] : abs_lt;
+assign unsigned_lt = (d1[31] ^ d2[31]) ? d2[31] : abs_lt;
 
-wire [32:0] add_result;
-assign add_result = {d1[31], d1}
-                    + {(sub_cmp ? {neg_d2[31], neg_d2} : {d2[31], d2})};
-
-wire cmp_eq, cmp_neg;
-assign cmp_eq = d1 == d2;
-assign cmp_neg = add_result[32];
+wire [31:0] add_result;
+assign add_result = d1 + (is_sub ? neg_d2 : d2);
 
 `ifndef VIGNA_CORE_BARREL_SHIFTER
     reg [4:0] shift_cnt;
@@ -278,9 +276,9 @@ assign cmp_neg = add_result[32];
 assign dr = 
     is_add || is_addi || is_jal || s_type
      || is_jalr || is_load || u_type
-     || is_sub                      ? add_result[31:0] : 
-    is_slt || is_slti || is_blt     ? {31'd0, cmp_neg} :
-    is_bge                          ? {31'd0, ~cmp_neg} :
+     || is_sub                      ? add_result : 
+    is_slt || is_slti || is_blt     ? {31'd0, signed_lt} :
+    is_bge                          ? {31'd0, ~signed_lt} :
     is_sltu || is_sltiu || is_bltu  ? {31'd0, unsigned_lt} : 
     is_bgeu                         ? {31'd0, ~unsigned_lt} :
     is_xor || is_xori               ? d1 ^ d2 :  
