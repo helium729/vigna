@@ -45,15 +45,6 @@
 //`define VIGNA_CORE_BARREL_SHIFTER
 //`define VIGNA_CORE_TWO_STAGE_SHIFT
 
-/* ------------------------------------------------------------------------- */
-
-/* two cycle alu option
- * calculate the result in two cycles
- * this option is recommended for the most cases
- * which will relax the timing in the alu logic */
-
-//`define VIGNA_CORE_TWO_CYCLE_ALU
-
 /*--------------------------------------------------------------------------*/
 
 /* preload negative option
