@@ -52,6 +52,14 @@
  * this option is recommended for the most cases
  * which will relax the timing in the alu logic */
 
-`define VIGNA_CORE_TWO_CYCLE_ALU
+//`define VIGNA_CORE_TWO_CYCLE_ALU
+
+/*--------------------------------------------------------------------------*/
+
+/* preload negative option
+ * preload the negative number for the alu
+ * this option uses more resources but provides better timing */
+
+`define VIGNA_CORE_PRELOAD_NEGATIVE
 
 `endif

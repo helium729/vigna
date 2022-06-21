@@ -246,6 +246,15 @@ wire [31:0] dr;
     reg [4:0] wb_reg;
 `endif 
 
+`ifndef VIGNA_CORE_BARREL_SHIFTER
+    reg [4:0] shift_cnt;
+    wire is_shift;
+    assign is_shift = is_sll || is_slli || is_srl || is_srli || is_sra || is_srai;
+    `ifdef VIGNA_CORE_TWO_STAGE_SHIFT
+    wire first_shift_stage;
+    assign first_shift_stage = shift_cnt[4:2] != 0;
+    `endif
+`endif
 
 wire cmp_eq;
 wire abs_lt;
@@ -257,16 +266,10 @@ assign signed_lt   = (d1[31] ^ d2[31]) ? d1[31] : abs_lt;
 assign unsigned_lt = (d1[31] ^ d2[31]) ? d2[31] : abs_lt;
 
 wire [31:0] add_result;
+`ifdef VIGNA_CORE_PRELOAD_NEGATIVE
 assign add_result = d1 + d2;
-
-`ifndef VIGNA_CORE_BARREL_SHIFTER
-    reg [4:0] shift_cnt;
-    wire is_shift;
-    assign is_shift = is_sll || is_slli || is_srl || is_srli || is_sra || is_srai;
-    `ifdef VIGNA_CORE_TWO_STAGE_SHIFT
-    wire first_shift_stage;
-    assign first_shift_stage = shift_cnt[4:2] != 0;
-    `endif
+`else
+assign add_result = d1 + (is_sub ? {~d2 + 32'd1} : d2);
 `endif
 
 //alu comb logic
@@ -344,7 +347,11 @@ always @ (posedge clk) begin
             4'b0000: begin
                 if (fetched) begin
                     d1 <= op1;
+                    `ifdef VIGNA_CORE_PRELOAD_NEGATIVE
                     d2 <= (is_sub ? ~op2 + 32'd1 : op2);
+                    `else
+                    d2 <= op2;
+                    `endif
                     if (s_type) begin
                         d3 <= rs2_val;
                     end else if (b_type) begin
