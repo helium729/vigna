@@ -267,7 +267,7 @@ assign unsigned_lt = (d1[31] ^ d2[31]) ? d2[31] : abs_lt;
 
 wire [31:0] add_result;
 `ifdef VIGNA_CORE_PRELOAD_NEGATIVE
-assign add_result = d1 + d2;
+assign add_result = d1 + d2 + is_sub;
 `else
 assign add_result = d1 + (is_sub ? {~d2 + 32'd1} : d2);
 `endif
@@ -348,7 +348,7 @@ always @ (posedge clk) begin
                 if (fetched) begin
                     d1 <= op1;
                     `ifdef VIGNA_CORE_PRELOAD_NEGATIVE
-                    d2 <= (is_sub ? ~op2 + 32'd1 : op2);
+                    d2 <= (is_sub ? ~op2 : op2);
                     `else
                     d2 <= op2;
                     `endif
