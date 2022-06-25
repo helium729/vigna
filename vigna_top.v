@@ -1,5 +1,6 @@
 `include "vigna_core.v"
 `include "utils/bus2to1.v"
+`include "vigna_conf.vh"
 
 module vigna_top(
     input clk,
