@@ -290,8 +290,7 @@ assign dr =
     is_sll || is_slli               ? d1 << d2[4:0] :
     is_srl || is_srli               ? d1 >> d2[4:0] : 
     is_sra || is_srai               ? d1 >>> d2[4:0] : 32'd0;
-`else
-`ifdef VIGNA_CORE_TWO_STAGE_SHIFT
+`elif VIGNA_CORE_TWO_STAGE_SHIFT
     is_sll || is_slli               ? (first_shift_stage ? {d3[27:0], 4'b0000} : {d3[30:0], 1'b0}) :
     is_srl || is_srli               ? (first_shift_stage ? {4'b0000, d3[31:4]} : {1'b0, d3[31:1]}) :
     is_sra || is_srai               ? (first_shift_stage ? {{4{d3[31]}}, d3[31:4]} : {d3[31], d3[31:1]}) : 32'd0;
@@ -300,7 +299,7 @@ assign dr =
     is_srl || is_srli               ? {1'b0, d3[31:1]} :
     is_sra || is_srai               ? {d3[31], d3[31:1]} : 32'd0;
 `endif
-`endif
+
 
 wire [31:0] inst_add_result;
 assign inst_add_result = inst_addr + (b_type ? imm: 32'd4);
