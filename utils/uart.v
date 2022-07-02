@@ -1,157 +1,171 @@
-module uartlite #(
-    parameter BAUD_RATE = 115200,
-    parameter CLK_FREQ  = 100000000
-)
-(
+/*Simple uart module by Claren Wolf*/
+module simpleuart #(parameter integer DEFAULT_DIV = 1) (
+	input clk,
+	input resetn,
+
+	output ser_tx,
+	input  ser_rx,
+
+	input   [3:0] reg_div_we,
+	input  [31:0] reg_div_di,
+	output [31:0] reg_div_do,
+
+	input         reg_dat_we,
+	input         reg_dat_re,
+	input  [31:0] reg_dat_di,
+	output [31:0] reg_dat_do,
+	output        reg_dat_wait
+);
+	reg [31:0] cfg_divider;
+
+	reg [3:0] recv_state;
+	reg [31:0] recv_divcnt;
+	reg [7:0] recv_pattern;
+	reg [7:0] recv_buf_data;
+	reg recv_buf_valid;
+
+	reg [9:0] send_pattern;
+	reg [3:0] send_bitcnt;
+	reg [31:0] send_divcnt;
+	reg send_dummy;
+
+	assign reg_div_do = cfg_divider;
+
+	assign reg_dat_wait = reg_dat_we && (send_bitcnt || send_dummy);
+	assign reg_dat_do = recv_buf_valid ? recv_buf_data : ~0;
+
+	always @(posedge clk) begin
+		if (!resetn) begin
+			cfg_divider <= DEFAULT_DIV;
+		end else begin
+			if (reg_div_we[0]) cfg_divider[ 7: 0] <= reg_div_di[ 7: 0];
+			if (reg_div_we[1]) cfg_divider[15: 8] <= reg_div_di[15: 8];
+			if (reg_div_we[2]) cfg_divider[23:16] <= reg_div_di[23:16];
+			if (reg_div_we[3]) cfg_divider[31:24] <= reg_div_di[31:24];
+		end
+	end
+
+	always @(posedge clk) begin
+		if (!resetn) begin
+			recv_state <= 0;
+			recv_divcnt <= 0;
+			recv_pattern <= 0;
+			recv_buf_data <= 0;
+			recv_buf_valid <= 0;
+		end else begin
+			recv_divcnt <= recv_divcnt + 1;
+			if (reg_dat_re)
+				recv_buf_valid <= 0;
+			case (recv_state)
+				0: begin
+					if (!ser_rx)
+						recv_state <= 1;
+					recv_divcnt <= 0;
+				end
+				1: begin
+					if (2*recv_divcnt > cfg_divider) begin
+						recv_state <= 2;
+						recv_divcnt <= 0;
+					end
+				end
+				10: begin
+					if (recv_divcnt > cfg_divider) begin
+						recv_buf_data <= recv_pattern;
+						recv_buf_valid <= 1;
+						recv_state <= 0;
+					end
+				end
+				default: begin
+					if (recv_divcnt > cfg_divider) begin
+						recv_pattern <= {ser_rx, recv_pattern[7:1]};
+						recv_state <= recv_state + 1;
+						recv_divcnt <= 0;
+					end
+				end
+			endcase
+		end
+	end
+
+	assign ser_tx = send_pattern[0];
+
+	always @(posedge clk) begin
+		if (reg_div_we)
+			send_dummy <= 1;
+		send_divcnt <= send_divcnt + 1;
+		if (!resetn) begin
+			send_pattern <= ~0;
+			send_bitcnt <= 0;
+			send_divcnt <= 0;
+			send_dummy <= 1;
+		end else begin
+			if (send_dummy && !send_bitcnt) begin
+				send_pattern <= ~0;
+				send_bitcnt <= 15;
+				send_divcnt <= 0;
+				send_dummy <= 0;
+			end else
+			if (reg_dat_we && !send_bitcnt) begin
+				send_pattern <= {1'b1, reg_dat_di[7:0], 1'b0};
+				send_bitcnt <= 10;
+				send_divcnt <= 0;
+			end else
+			if (send_divcnt > cfg_divider && send_bitcnt) begin
+				send_pattern <= {1'b1, send_pattern[9:1]};
+				send_bitcnt <= send_bitcnt - 1;
+				send_divcnt <= 0;
+			end
+		end
+	end
+endmodule
+
+/* our uart wrapper */
+module uart #(parameter integer DEFAULT_DIV = 1)(
     input clk,
-    input resetn,
+    input reset_n,
 
     input  s_valid,
     output s_ready,
     input  [31:0] s_addr,
     output [31:0] s_rdata,
     input  [31:0] s_wdata,
-    input  [ 4:0] s_wstrb,
+    input  [ 3:0] s_wstrb,
 
-    input  wire uart_rxd,
-    output reg  uart_txd
-);
+    input  uart_rx,
+    output uart_tx
+    );
 
-    reg [7:0] r_fifo  [31:0];
-    reg [7:0] t_fifo [31:0];
-    reg [4:0] r_fifo_head_pointer;
-    reg [4:0] t_fifo_head_pointer;
-    reg [4:0] r_fifo_tail_pointer;
-    reg [4:0] t_fifo_tail_pointer;
-    
-    wire [4:0] r_fifo_head_pointer_next;
-    wire [4:0] t_fifo_head_pointer_next;
+	wire        simpleuart_reg_div_sel = s_valid && (s_addr[7:0] == 8'h04);
+	wire [31:0] simpleuart_reg_div_do;
 
-    assign t_fifo_head_pointer_next = t_fifo_head_pointer + 1;
-    assign r_fifo_head_pointer_next = r_fifo_head_pointer + 1;
-    
-    //control signals
-    wire r_fifo_empty;
-    wire r_fifo_full;
-    wire t_fifo_empty;
-    wire t_fifo_full;
-    wire [31:0] ctrl_sig;
-    assign r_fifo_empty = (r_fifo_head_pointer == r_fifo_tail_pointer);
-    assign r_fifo_full  = (r_fifo_tail_pointer == r_fifo_head_pointer_next);
-    assign t_fifo_empty = (t_fifo_head_pointer == t_fifo_tail_pointer);
-    assign t_fifo_full  = (t_fifo_tail_pointer == t_fifo_head_pointer_next);
-    assign ctrl_sig = {27'd0, r_fifo_empty, r_fifo_full, t_fifo_empty, t_fifo_full};
+	wire        simpleuart_reg_dat_sel = s_valid && (s_addr[7:0] == 8'h08);
+	wire [31:0] simpleuart_reg_dat_do;
+	wire        simpleuart_reg_dat_wait;
 
-    wire [31:0] r_uart_data;
-    wire [31:0] t_uart_data;
-
-    //bus state machine
-    reg hand_shake;
-    always @(posedge clk) begin
-        if(resetn == 0) begin
-            hand_shake <= 0;
-        end else begin
-            if (s_valid) begin
-                hand_shake <= 1'b1;
-            end else if (hand_shake) begin
-                r_fifo_tail_pointer <= r_fifo_tail_pointer + 1;
-                hand_shake <= 0;
-            end
-        end 
-    end
-    assign s_ready = hand_shake & s_valid;
-    assign s_rdata = s_addr[3:0] == 4'b0000 ? ctrl_sig :
-                     s_addr[3:0] == 4'b0100 ? r_uart_data :
-                     s_addr[3:0] == 4'b1000 ? t_uart_data : 0;
-
-    //receive state machine
-    reg [1:0] r_state;
-    reg [31:0] r_counter;
-    reg [3:0] r_bit_count;
-    reg [7:0] r_temp_data;
-    always @ (posedge clk) begin
-        if (!resetn) begin
-            r_state <= 2'b00;
-            r_counter <= 0;
-            r_fifo_head_pointer <= 0;
-        end
-        else begin
-            if (r_state == 2'b00) begin 
-                if (uart_rxd == 1'b0) begin
-                    r_state <= 2'b01;
-                    r_counter <= 0;
-                end
-            end
-            else if (r_state == 2'b01) begin 
-                r_counter <= r_counter + 32'd1;
-                if (r_counter == (CLK_FREQ/BAUD_RATE)/2) begin
-                    r_state <= 2'b11;
-                    r_counter <= 0;
-                    r_bit_count <= 0;
-                    r_temp_data <= 0;
-                end
-            end
-            else if (r_state == 2'b11) begin 
-                if (r_counter == (CLK_FREQ/BAUD_RATE)) begin
-                    r_counter <= 0;
-                    if (r_bit_count < 8) r_temp_data[r_bit_count] <= uart_rxd;
-                    if (r_bit_count == 9) begin
-                        r_state <= 2'b10;
-                    end
-                    r_bit_count <= r_bit_count + 1;
-                end
-                else r_counter <= r_counter + 1;
-            end
-            else if (r_state == 2'b10) begin 
-                if (!r_fifo_full) begin
-                    r_fifo[r_fifo_head_pointer] <= r_temp_data;
-                    r_fifo_head_pointer <= r_fifo_head_pointer_next;
-                end
-                r_state <= 2'b00;
-            end
-        end
-    end
-    assign r_uart_data = r_fifo_empty ? 32'd0 : r_fifo[r_fifo_tail_pointer];
-
-    //transmit state machine
-    reg [1:0] t_state;
-    reg [31:0] t_counter;
-    reg [3:0] t_bit_count;
-    wire [7:0] t_temp_data;
-    assign t_temp_data = t_fifo_empty ? 8'b0 : t_fifo[t_fifo_tail_pointer];
-    always @ (posedge clk) begin
-        if (!resetn) begin
-            uart_txd <= 1'b1;
-            t_state <= 2'b00;
-            t_counter <= 0;
-            t_fifo_tail_pointer <= 0;
-        end
-        else begin
-            if (t_state == 2'b00) begin
-                if (!t_fifo_empty) begin
-                    t_state <= 2'b01;
-                    t_counter <= 0;
-                    uart_txd <= 1'b0;
-                end
-                else
-                    uart_txd <= 1'b1;
-            end
-            else if (t_state == 2'b01) begin
-                if (t_counter == (CLK_FREQ/BAUD_RATE)) begin
-                    t_counter <= 0;
-                    if (t_bit_count < 8) uart_txd <= t_temp_data[t_bit_count];
-                    if (t_bit_count == 8) begin
-                        t_state <= 2'b11;
-                        t_fifo_tail_pointer <= t_fifo_tail_pointer + 1;
-                        uart_txd <= 1'b1;
-                    end
-                    t_bit_count <= t_bit_count + 1;
-                end
-                else t_counter <= t_counter + 1;
-            end
-        end
-    end
-    
+    assign s_ready = simpleuart_reg_div_sel || (simpleuart_reg_dat_sel && !simpleuart_reg_dat_wait);
+    assign s_rdata = simpleuart_reg_div_sel ? simpleuart_reg_div_do :
+	                 simpleuart_reg_dat_sel ? simpleuart_reg_dat_do : 32'h 0000_0000;
 
     
+
+simpleuart #(
+    .DEFAULT_DIV(DEFAULT_DIV)
+)simple_uart (
+		.clk         (clk         ),
+		.resetn      (reset_n      ),
+
+		.ser_tx      (uart_tx      ),
+		.ser_rx      (uart_rx      ),
+
+		.reg_div_we  (simpleuart_reg_div_sel ? s_wstrb : 4'b 0000),
+		.reg_div_di  (s_wdata),
+		.reg_div_do  (simpleuart_reg_div_do),
+
+		.reg_dat_we  (simpleuart_reg_dat_sel ? s_wstrb[0] : 1'b 0),
+		.reg_dat_re  (simpleuart_reg_dat_sel && !s_wstrb),
+		.reg_dat_di  (s_wdata),
+		.reg_dat_do  (simpleuart_reg_dat_do),
+		.reg_dat_wait(simpleuart_reg_dat_wait)
+	);
+
+
 endmodule
