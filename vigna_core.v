@@ -49,7 +49,7 @@ wire [31:0] inst;
 wire [31:0] inst_addr;
 reg  [ 1:0] fetch_state;
 
-reg fetch_recieved;
+reg fetch_received;
 wire fetched;
 assign fetched = (fetch_state == 1 && i_ready) || fetch_state == 3;
 
@@ -77,7 +77,7 @@ always @ (posedge clk) begin
                 end
             end
             3: begin
-                if (fetch_recieved) begin
+                if (fetch_received) begin
                     i_valid     <= 1;
                     pc          <= pc_next;
                     fetch_state <= 1;
@@ -327,7 +327,7 @@ always @ (posedge clk) begin
         d2             <= 0;
         d3             <= 0;
         exec_state     <= 0;
-        fetch_recieved <= 0;
+        fetch_received <= 0;
         wb_reg         <= 0;
         ex_jump        <= 0;
         ex_branch      <= 0;
@@ -363,7 +363,7 @@ always @ (posedge clk) begin
                     `endif 
                     end
                 
-                    fetch_recieved <= 1;
+                    fetch_received <= 1;
                     
                     if (u_type || j_type || i_type || r_type) begin
                         `ifdef VIGNA_CORE_E_EXTENSION
@@ -408,7 +408,7 @@ always @ (posedge clk) begin
                 end
             end
             4'b0001: begin
-                fetch_recieved <= 0;
+                fetch_received <= 0;
                 //load/store func
                 if (!write_mem) begin
                     d_valid    <= 1;
@@ -429,7 +429,7 @@ always @ (posedge clk) begin
                 if (wb_reg != 0) begin
                     cpu_regs[wb_reg] <= dr;
                 end
-                fetch_recieved <= 0;
+                fetch_received <= 0;
             end
             4'b0100: begin
                 //jump func
@@ -437,12 +437,12 @@ always @ (posedge clk) begin
                 if (wb_reg != 0) begin
                     cpu_regs[wb_reg] <= d3;
                 end
-                fetch_recieved <= 0;
+                fetch_received <= 0;
             end
             4'b1000: begin
                 //branch func
                 exec_state     <= 0;
-                fetch_recieved <= 0;
+                fetch_received <= 0;
             end
             4'b0011: begin
                 //load wait stage
@@ -456,7 +456,7 @@ always @ (posedge clk) begin
                         else                         cpu_regs[wb_reg] <= d_rdata;
                     end
                 end
-                fetch_recieved <= 0;
+                fetch_received <= 0;
             end
             4'b0101: begin
                 //store wait stage
@@ -466,12 +466,12 @@ always @ (posedge clk) begin
                     d_wstrb    <= 4'd0;
                     d_wdata    <= 0;
                 end
-                fetch_recieved <= 0;
+                fetch_received <= 0;
             end
             `ifndef VIGNA_CORE_BARREL_SHIFTER
             4'b0110: begin
                 //shift func
-                fetch_recieved <= 0;
+                fetch_received <= 0;
                 if (shift_cnt == 0) begin
                     exec_state <= 0;
                     cpu_regs[wb_reg] <= d3;
