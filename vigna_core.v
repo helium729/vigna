@@ -38,6 +38,15 @@ module vigna(
     input      [31:0] d_rdata,
     output reg [31:0] d_wdata,
     output reg [ 3:0] d_wstrb
+`ifdef VIGNA_M_EXTENSION
+    ,
+    output        mext_valid,
+    input         mext_ready,
+    output [2:0]  mext_func,
+    output [31:0] mext_op1,
+    output [31:0] mext_op2,
+    input  [31:0] mext_result
+`endif 
 );
 
 //program counter
