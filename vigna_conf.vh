@@ -53,4 +53,8 @@
 
 `define VIGNA_CORE_PRELOAD_NEGATIVE
 
+/*--------------------------------------------------------------------------*/
+
+`define VIGNA_CORE_M_EXTENSION
+
 `endif

@@ -22,6 +22,10 @@
 `timescale 1ns / 1ps
 `include "vigna_conf.vh"
 
+`ifdef VIGNA_CORE_M_EXTENSION
+`include "vigna_coproc.v"
+`endif 
+
 //vigna top module
 module vigna(
     input clk,
@@ -38,6 +42,15 @@ module vigna(
     input      [31:0] d_rdata,
     output reg [31:0] d_wdata,
     output reg [ 3:0] d_wstrb
+`ifdef VIGNA_M_EXTENSION
+    ,
+    output        mext_valid,
+    input         mext_ready,
+    output [2:0]  mext_func,
+    output [31:0] mext_op1,
+    output [31:0] mext_op2,
+    input  [31:0] mext_result
+`endif 
 );
 
 //program counter
@@ -207,6 +220,12 @@ assign is_auipc = opcode == 7'b0010111;
 //j type
 assign is_jal = j_type;
 
+`ifdef VIGNA_CORE_M_EXTENSION
+//m type
+wire is_m_coproc;
+assign is_m_coproc = r_type && funct7 == 7'b0000001;
+`endif
+
 //rs1 from reg
 wire [31:0] rs1_val;
 //rs2 from reg
@@ -224,7 +243,7 @@ wire [31:0] rs2_val;
 `endif
 
 wire [31:0] op1, op2;
-assign op1 = is_jal || u_type ? imm : rs1_val;
+assign op1 = is_jal || u_type   ? imm : rs1_val;
 assign op2 = r_type || b_type   ? rs2_val :
              is_auipc || j_type ? inst_addr :
              is_slli || is_srli ? {27'b0, shamt} :
@@ -315,6 +334,20 @@ assign pc_next =  ex_jump           ? dr :
 
 reg write_mem;
 
+`ifdef VIGNA_CORE_M_EXTENSION
+    wire m_ready;
+    wire [31:0] m_result;
+    vigna_m_ext mul_unit(
+        .clk(clk),
+        .resetn(resetn),
+        .valid(d3[3] & is_m_coproc),
+        .ready(m_ready),
+        .op1(d1),
+        .op2(d2),
+        .result(m_result)
+    );
+`endif
+
 //part2. executon unit
 always @ (posedge clk) begin
     //reset logic
@@ -361,6 +394,11 @@ always @ (posedge clk) begin
                     end else if (is_shift) begin
                         d3 <= op1;
                     `endif 
+                    `ifdef VIGNA_CORE_M_EXTENSION
+                    end else if (is_m_coproc) begin 
+                        d3[2:0] <= funct3;
+                        d3[3]   <= 1;
+                    `endif
                     end
                 
                     fetch_received <= 1;
@@ -485,6 +523,16 @@ always @ (posedge clk) begin
                     d3 <= dr;
                 end
             end 
+            `endif
+            `ifdef VIGNA_CORE_M_EXTENSION
+            4'b1001: begin
+                fetch_recieved <= 0;
+                d3[3] <= 0;
+                if (m_ready) begin
+                    cpu_regs[wb_reg] <= m_result;
+                    exec_state <= 0;
+                end
+            end
             `endif
             default: begin
                 exec_state <= 0;
