@@ -55,6 +55,6 @@
 
 /*--------------------------------------------------------------------------*/
 
-`define VIGNA_M_EXTENSION
+`define VIGNA_CORE_M_EXTENSION
 
 `endif

@@ -1,3 +1,7 @@
+
+`ifndef VIGNA_COPROC
+`define VIGNA_COPROC
+
 module vigna_m_ext(
     input clk,
     input resetn,
@@ -5,6 +9,7 @@ module vigna_m_ext(
     input         valid,
     output reg    ready,
     input  [2:0]  func,
+    input  [2:0]  id,
     input  [31:0] op1,
     input  [31:0] op2,
     output [31:0] result
@@ -14,6 +19,7 @@ module vigna_m_ext(
     reg [63:0] d2;
     reg [63:0] dr;
     reg [2:0]  state;
+    reg [4:0]  ctr;
 
     wire is_mul, is_mulh, is_mulhsu, is_mulhu;
     assign is_mul    = func == 3'b000;
@@ -33,7 +39,7 @@ module vigna_m_ext(
     assign sign = is_mulhsu                  ? op1[31] :
                   is_mul || is_div || is_rem ? op1[31] ^ op2[31] : 0;
 
-    assign result = (is_mulh || is_mulhsu || is_mulhu) ? dr[63:32] : dr[31:0];
+    assign result = (is_mulh || is_mulhsu || is_mulhu || is_div || is_divu) ? dr[63:32] : dr[31:0];
 
     always @ (posedge clk) begin
         if (!resetn) begin
@@ -41,6 +47,7 @@ module vigna_m_ext(
             d2     <= 0;
             dr     <= 0;
             state  <= 0;
+            ctr    <= 0; 
         end
         else begin 
             case (state)
@@ -56,9 +63,9 @@ module vigna_m_ext(
                             state <= 2;
                         end
                         else begin
-                            d1 <= (op1[31] && !func[0]) ? ~op1 + 1 : op1;
-                            d2 <= (op2[31] && !func[0]) ? ~op2 + 1 : op2;
-                            state <= 3;
+                            d1 <= (op1[31] && !func[0]) ? ~op1 + 32'd1 : op1;
+                            d2 <= {1'b0, (op2[31] && !func[0]) ? (~op2 + 32'd1) : op2, 31'd0};
+                            state <= 4;
                         end
                     end
                 end
@@ -67,26 +74,44 @@ module vigna_m_ext(
                     state <= 0;
                 end
                 2: begin //mul_calc_stage
-                    if (d1 != 0) begin
-                        dr <= dr + (d1[0] ? d2 : 0);
-                        d1 <= {1'b0, d1[31:1]};
-                        d2 <= {d2[62:0], 1'b0};
-                    end
-                    else begin
-                        dr <= sign ? (~dr + 64'd1) : dr;
-                        state <= 1;
-                        ready <= 1;
-                        d1    <= op1;
-                        d2    <= op2;
-                    end
+                    dr <= dr + (d1[0] ? d2 : 0);
+                    d1 <= {1'b0, d1[31:1]};
+                    d2 <= {d2[62:0], 1'b0};
+                    ctr <= ctr + 5'd1;
+                    if (ctr == 5'd31) 
+                        state <= 3;
                 end
                 3: begin
+                    d1 <= op1;
+                    d2 <= op2;
+                    dr <= sign ? (~dr + 64'd1) : dr;
+                    state <= 1;
+                    ready <= 1;
+                    ctr   <= 0;
+                end
+                4: begin
                     if (d2 == 0) begin
                         state <= 1;
                         ready <= 1;
                         dr <= 0;
                     end
-                    //else need to do div
+                    if (d2[63:32] == 0 && d1 > d2[31:0]) begin
+                        d1 <= d1 - d2[31:0];
+                        dr[63:32] <= {dr[62:32], 1'b1};
+                    end
+                    else 
+                        dr[63:32] <= {dr[62:32], 1'b0};
+                    d2 <= {1'b0, d2[63:1]};
+                    ctr <= ctr + 1;
+                    if (ctr == 5'd31) 
+                        state <= 5;
+                end
+                5: begin
+                    dr[31:0] <= sign ? (~d1[31:0] + 32'd1) : d1[31:0];
+                    dr[63:32] <= sign ? (~dr[63:32] + 32'd1) : dr[63:32];
+                    state <= 1;
+                    ready <= 1;
+                    ctr   <= 0;
                 end
                 default: begin
                     state <= 0;
@@ -96,3 +121,5 @@ module vigna_m_ext(
     end
 
 endmodule
+
+`endif 
