@@ -526,7 +526,7 @@ always @ (posedge clk) begin
             `endif
             `ifdef VIGNA_CORE_M_EXTENSION
             4'b1001: begin
-                fetch_recieved <= 0;
+                fetch_received <= 0;
                 d3[3] <= 0;
                 if (m_ready) begin
                     cpu_regs[wb_reg] <= m_result;
