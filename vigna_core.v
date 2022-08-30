@@ -270,16 +270,14 @@ wire [31:0] dr;
     reg [4:0] wb_reg;
 `endif 
 
-`ifndef VIGNA_CORE_BARREL_SHIFTER
     reg [4:0] shift_cnt;
     reg [2:0] l_sll_srl_sra;
     wire [31:0] shift_val;
     wire is_shift;
     assign is_shift = is_sll || is_slli || is_srl || is_srli || is_sra || is_srai;
-    `ifdef VIGNA_CORE_TWO_STAGE_SHIFT
+`ifdef VIGNA_CORE_TWO_STAGE_SHIFT
     wire first_shift_stage;
     assign first_shift_stage = shift_cnt[4:2] != 0;
-    `endif
 `endif
 
 wire cmp_eq;
@@ -311,14 +309,7 @@ assign dr =
     is_or || is_ori                 ? d1 | d2 : 
     is_and || is_andi               ? d1 & d2 : 
     is_beq                          ? {31'd0, cmp_eq} : 
-    is_bne                          ? {31'd0, ~cmp_eq} : 
-`ifdef VIGNA_CORE_BARREL_SHIFTER
-    is_sll || is_slli               ? d1 << d2[4:0] :
-    is_srl || is_srli               ? d1 >> d2[4:0] : 
-    is_sra || is_srai               ? d1 >>> d2[4:0] : 32'd0;
-`else 
-    32'd0;
-`endif 
+    is_bne                          ? {31'd0, ~cmp_eq} : 32'd0;
 
 assign shift_val =
 `ifdef  VIGNA_CORE_TWO_STAGE_SHIFT
@@ -330,8 +321,6 @@ assign shift_val =
     l_sll_srl_sra[1]  ? {1'b0, d3[31:1]} :
     l_sll_srl_sra[0]  ? {d3[31], d3[31:1]} : 32'd0;
 `endif
-
-
 
 wire [31:0] inst_add_result;
 assign inst_add_result = inst_addr + (b_type ? imm: 32'd4);
@@ -386,10 +375,8 @@ always @ (posedge clk) begin
         `ifdef VIGNA_CORE_STACK_ADDR_RESET_ENABLE
             cpu_regs[2] <= `VIGNA_CORE_STACK_ADDR_RESET_VALUE;
         `endif
-        `ifndef VIGNA_CORE_BARREL_SHIFTER
-            shift_cnt <= 0;
-            l_sll_srl_sra <= 0;
-        `endif
+        shift_cnt <= 0;
+        l_sll_srl_sra <= 0;
     end else begin
         //state machine
         case (exec_state)
@@ -407,12 +394,10 @@ always @ (posedge clk) begin
                         d3 <= inst_add_result;
                     end else if (is_jal || is_jalr) begin
                         d3 <= inst_add_result;
-                    `ifndef VIGNA_CORE_BARREL_SHIFTER
                     end else if (is_shift) begin
                         l_sll_srl_sra <= {is_sll || is_slli, is_srl || is_srli, is_sra || is_srai};
                         d3 <= op1;
                         shift_cnt <= op2[4:0];
-                    `endif 
                     `ifdef VIGNA_CORE_M_EXTENSION
                     end else if (is_m_coproc) begin 
                         d3[2:0] <= funct3;
@@ -444,11 +429,9 @@ always @ (posedge clk) begin
                     else if (b_type) begin
                         exec_state <= 4'b1000;
                     end
-                    `ifndef VIGNA_CORE_BARREL_SHIFTER
                     else if (is_shift) begin
                         exec_state <= 4'b0110;
                     end
-                    `endif
                     `ifdef VIGNA_CORE_M_EXTENSION
                     else if (is_m_coproc) begin
                         exec_state <= 4'b1001;
@@ -524,7 +507,6 @@ always @ (posedge clk) begin
                     d_wdata    <= 0;
                 end
             end
-            `ifndef VIGNA_CORE_BARREL_SHIFTER
             4'b0110: begin
                 //shift func
                 if (shift_cnt == 0) begin
@@ -540,7 +522,6 @@ always @ (posedge clk) begin
                     d3 <= shift_val;
                 end
             end 
-            `endif
             `ifdef VIGNA_CORE_M_EXTENSION
             4'b1001: begin
                 m_valid <= 0;

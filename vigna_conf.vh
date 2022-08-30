@@ -26,24 +26,26 @@
 
 /* core stack pointer(x2) reset
  * note that in the spec, the stack pointer should be aligned to 16 bytes
- * uncomment the first line to enable this feature */
+ * uncomment the first line to enable this feature 
+ * WARNING: this configuration might cause the area to double, setting 
+ * the register with proper software is recommended.
+ */
 
 //`define VIGNA_CORE_STACK_ADDR_RESET_ENABLE 
-`define VIGNA_CORE_STACK_ADDR_RESET_VALUE 32'h0000_1000
+//`define VIGNA_CORE_STACK_ADDR_RESET_VALUE 32'h0000_1000
+
+/* ------------------------------------------------------------------------- */
 
 /* ------------------------------------------------------------------------- */
 
 /* shift instruction options 
- * barrel shifter: finishing shift in one cycle
  * two-stage shift: make shifts in 4 bits then 1 bit
  * none: shift one bit per cycle
- * in practice, barrel shifter is the most efficient
- * while two-stage shift provides the best timing (area is about the same)
+ * two-stage shift provides the best timing (while larger),
  * the 1-bit shift logic has the minimum area  
  */
 
-//`define VIGNA_CORE_BARREL_SHIFTER
-//`define VIGNA_CORE_TWO_STAGE_SHIFT
+`define VIGNA_CORE_TWO_STAGE_SHIFT
 
 /*--------------------------------------------------------------------------*/
 
