@@ -31,7 +31,7 @@ module vigna(
     input clk,
     input resetn,
 
-    output reg        i_valid,
+    output            i_valid,
     input             i_ready,
     output     [31:0] i_addr,
     input      [31:0] i_rdata,
@@ -58,47 +58,52 @@ reg  [31:0] pc;
 wire [31:0] pc_next;
 
 //part 1: fetching unit
-wire [31:0] inst;
+reg  [31:0] inst;
 wire [31:0] inst_addr;
 reg  [ 1:0] fetch_state;
+reg  internal_valid;
 
-reg fetch_received;
-wire fetched;
-assign fetched = (fetch_state == 1 && i_ready) || fetch_state == 3;
+wire fetched, fetch_received;
+assign fetched = fetch_state == 3;
 
-assign inst = i_ready ? i_rdata : inst;
+
+
+//assign inst = i_ready ? i_rdata : inst;
 assign inst_addr = i_addr;
 assign i_addr = pc;
+
+assign i_valid = internal_valid;
 
 always @ (posedge clk) begin
     //reset logic
     if (!resetn) begin
-        pc          <= `VIGNA_CORE_RESET_ADDR;
-        fetch_state <= 0;
-        i_valid     <= 0;
+        pc              <= `VIGNA_CORE_RESET_ADDR;
+        fetch_state     <= 0;
+        internal_valid  <= 0;
     end else begin
         //fetch logic
         case (fetch_state)
             0: begin
-                i_valid     <= 1;
+                internal_valid     <= 1;
                 fetch_state <= 1;
             end
             1: begin
                 if (i_ready) begin
-                    i_valid     <= 0;
-                    fetch_state <= 3;
+                    inst            <= i_rdata;
+                    internal_valid  <= 0;
+                    fetch_state     <= 3;
                 end
             end
             3: begin
                 if (fetch_received) begin
-                    i_valid     <= 1;
-                    pc          <= pc_next;
-                    fetch_state <= 1;
+                    internal_valid  <= 1;
+                    pc              <= pc_next;
+                    fetch_state     <= 1;
                 end
             end
             default: begin
-                i_valid     <= 0;
-                fetch_state <= 0;
+                internal_valid  <= 0;
+                fetch_state     <= 0;
             end
         endcase
     end
@@ -176,7 +181,7 @@ assign is_slt  = funct3 == 3'b010 && funct7_zero    && r_type;
 assign is_sltu = funct3 == 3'b011 && funct7_zero    && r_type;
 assign is_xor  = funct3 == 3'b100 && funct7_zero    && r_type;
 assign is_srl  = funct3 == 3'b101 && funct7_zero    && r_type;
-assign is_sra  = funct3 == 3'b101 && funct7_zero    && r_type;
+assign is_sra  = funct3 == 3'b101 && funct7_sub_sra && r_type;
 assign is_or   = funct3 == 3'b110 && funct7_zero    && r_type;
 assign is_and  = funct3 == 3'b111 && funct7_zero    && r_type;
 
@@ -252,7 +257,7 @@ assign op2 = r_type || b_type   ? rs2_val :
 //backend state
 reg [3:0] exec_state;
 
-//source reg
+//source regex_jump
 reg [31:0] d1, d2, d3;
 
 //result
@@ -267,6 +272,8 @@ wire [31:0] dr;
 
 `ifndef VIGNA_CORE_BARREL_SHIFTER
     reg [4:0] shift_cnt;
+    reg [2:0] l_sll_srl_sra;
+    wire [31:0] shift_val;
     wire is_shift;
     assign is_shift = is_sll || is_slli || is_srl || is_srli || is_sra || is_srai;
     `ifdef VIGNA_CORE_TWO_STAGE_SHIFT
@@ -309,15 +316,21 @@ assign dr =
     is_sll || is_slli               ? d1 << d2[4:0] :
     is_srl || is_srli               ? d1 >> d2[4:0] : 
     is_sra || is_srai               ? d1 >>> d2[4:0] : 32'd0;
-`elif VIGNA_CORE_TWO_STAGE_SHIFT
-    is_sll || is_slli               ? (first_shift_stage ? {d3[27:0], 4'b0000} : {d3[30:0], 1'b0}) :
-    is_srl || is_srli               ? (first_shift_stage ? {4'b0000, d3[31:4]} : {1'b0, d3[31:1]}) :
-    is_sra || is_srai               ? (first_shift_stage ? {{4{d3[31]}}, d3[31:4]} : {d3[31], d3[31:1]}) : 32'd0;
 `else 
-    is_sll || is_slli               ? {d3[30:0], 1'b0} :
-    is_srl || is_srli               ? {1'b0, d3[31:1]} :
-    is_sra || is_srai               ? {d3[31], d3[31:1]} : 32'd0;
+    32'd0;
+`endif 
+
+assign shift_val =
+`ifdef  VIGNA_CORE_TWO_STAGE_SHIFT
+    l_sll_srl_sra[2]  ? (first_shift_stage ? {d3[27:0], 4'b0000} : {d3[30:0], 1'b0}) :
+    l_sll_srl_sra[1]  ? (first_shift_stage ? {4'b0000, d3[31:4]} : {1'b0, d3[31:1]}) :
+    l_sll_srl_sra[0]  ? (first_shift_stage ? {{4{d3[31]}}, d3[31:4]} : {d3[31], d3[31:1]}) : 32'd0;
+`else 
+    l_sll_srl_sra[2]  ? {d3[30:0], 1'b0} :
+    l_sll_srl_sra[1]  ? {1'b0, d3[31:1]} :
+    l_sll_srl_sra[0]  ? {d3[31], d3[31:1]} : 32'd0;
 `endif
+
 
 
 wire [31:0] inst_add_result;
@@ -334,17 +347,21 @@ assign pc_next =  ex_jump           ? dr :
 
 reg write_mem;
 
+wire is_jump = is_jal || is_jalr;
+
 `ifdef VIGNA_CORE_M_EXTENSION
+    reg m_valid;
     wire m_ready;
     wire [31:0] m_result;
     vigna_m_ext mul_unit(
         .clk(clk),
         .resetn(resetn),
-        .valid(d3[3] & is_m_coproc),
+        .valid(m_valid),
         .ready(m_ready),
         .op1(d1),
         .op2(d2),
-        .result(m_result)
+        .result(m_result),
+        .func(d3[2:0])
     );
 `endif
 
@@ -360,7 +377,6 @@ always @ (posedge clk) begin
         d2             <= 0;
         d3             <= 0;
         exec_state     <= 0;
-        fetch_received <= 0;
         wb_reg         <= 0;
         ex_jump        <= 0;
         ex_branch      <= 0;
@@ -372,6 +388,7 @@ always @ (posedge clk) begin
         `endif
         `ifndef VIGNA_CORE_BARREL_SHIFTER
             shift_cnt <= 0;
+            l_sll_srl_sra <= 0;
         `endif
     end else begin
         //state machine
@@ -392,17 +409,18 @@ always @ (posedge clk) begin
                         d3 <= inst_add_result;
                     `ifndef VIGNA_CORE_BARREL_SHIFTER
                     end else if (is_shift) begin
+                        l_sll_srl_sra <= {is_sll || is_slli, is_srl || is_srli, is_sra || is_srai};
                         d3 <= op1;
+                        shift_cnt <= op2[4:0];
                     `endif 
                     `ifdef VIGNA_CORE_M_EXTENSION
                     end else if (is_m_coproc) begin 
                         d3[2:0] <= funct3;
-                        d3[3]   <= 1;
+
+                        m_valid   <= 1;
                     `endif
                     end
-                
-                    fetch_received <= 1;
-                    
+                                    
                     if (u_type || j_type || i_type || r_type) begin
                         `ifdef VIGNA_CORE_E_EXTENSION
                             wb_reg <= rd[3:0];
@@ -428,10 +446,14 @@ always @ (posedge clk) begin
                     end
                     `ifndef VIGNA_CORE_BARREL_SHIFTER
                     else if (is_shift) begin
-                        shift_cnt <= op2[4:0];
                         exec_state <= 4'b0110;
                     end
                     `endif
+                    `ifdef VIGNA_CORE_M_EXTENSION
+                    else if (is_m_coproc) begin
+                        exec_state <= 4'b1001;
+                    end
+                    `endif 
                     else begin
                         exec_state <= 4'b0010;
                     end
@@ -446,7 +468,6 @@ always @ (posedge clk) begin
                 end
             end
             4'b0001: begin
-                fetch_received <= 0;
                 //load/store func
                 if (!write_mem) begin
                     d_valid    <= 1;
@@ -467,20 +488,19 @@ always @ (posedge clk) begin
                 if (wb_reg != 0) begin
                     cpu_regs[wb_reg] <= dr;
                 end
-                fetch_received <= 0;
             end
             4'b0100: begin
                 //jump func
                 exec_state <= 0;
+                ex_jump    <= 0;
                 if (wb_reg != 0) begin
                     cpu_regs[wb_reg] <= d3;
                 end
-                fetch_received <= 0;
             end
             4'b1000: begin
                 //branch func
                 exec_state     <= 0;
-                fetch_received <= 0;
+                ex_branch      <= 0;
             end
             4'b0011: begin
                 //load wait stage
@@ -494,7 +514,6 @@ always @ (posedge clk) begin
                         else                         cpu_regs[wb_reg] <= d_rdata;
                     end
                 end
-                fetch_received <= 0;
             end
             4'b0101: begin
                 //store wait stage
@@ -504,12 +523,10 @@ always @ (posedge clk) begin
                     d_wstrb    <= 4'd0;
                     d_wdata    <= 0;
                 end
-                fetch_received <= 0;
             end
             `ifndef VIGNA_CORE_BARREL_SHIFTER
             4'b0110: begin
                 //shift func
-                fetch_received <= 0;
                 if (shift_cnt == 0) begin
                     exec_state <= 0;
                     cpu_regs[wb_reg] <= d3;
@@ -520,14 +537,13 @@ always @ (posedge clk) begin
                     else
                     `endif
                         shift_cnt <= shift_cnt - 1;
-                    d3 <= dr;
+                    d3 <= shift_val;
                 end
             end 
             `endif
             `ifdef VIGNA_CORE_M_EXTENSION
             4'b1001: begin
-                fetch_received <= 0;
-                d3[3] <= 0;
+                m_valid <= 0;
                 if (m_ready) begin
                     cpu_regs[wb_reg] <= m_result;
                     exec_state <= 0;
@@ -540,6 +556,13 @@ always @ (posedge clk) begin
         endcase
     end
 end
+
+wire is_branch;
+assign is_branch = is_beq || is_bne || is_blt || is_bge || is_bltu || is_bgeu;
+
+assign fetch_received = (exec_state == 4'b0000 && !is_jump && !is_branch)
+                        || (exec_state == 4'b0100)
+                        || (exec_state == 4'b1000);
 
 endmodule
 

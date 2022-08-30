@@ -36,8 +36,8 @@ module vigna_m_ext(
 
     wire sign;
 
-    assign sign = is_mulhsu                  ? op1[31] :
-                  is_mul || is_div || is_rem ? op1[31] ^ op2[31] : 0;
+    assign sign = is_mulhsu                   ? op1[31] :
+                  is_div || is_rem || is_mulh ? op1[31] ^ op2[31] : 0;
 
     assign result = (is_mulh || is_mulhsu || is_mulhu || is_div || is_divu) ? dr[63:32] : dr[31:0];
 
@@ -48,24 +48,23 @@ module vigna_m_ext(
             dr     <= 0;
             state  <= 0;
             ctr    <= 0; 
+            ready  <= 0;
         end
         else begin 
             case (state)
                 0: begin 
                     if (valid) begin
-                        if ((op1 == d1) && (op2 == d2) && is_mul) begin
-                            state <= 1;
-                            ready <= 1;
-                        end
-                        else if (!func[2]) begin
-                            d1 <= ((func[1] ^ func[0]) && op1[31]) ? ~op1 + 1 : op1;
+                        if (!func[2]) begin
+                            d1 <= ((func[1] ^ func[0]) && op1[31]) ? (~op1 + 32'd1) : op1;
                             d2 <= {32'd0, (is_mulh && op2[31]) ? (~op2 + 32'd1) : op2};
                             state <= 2;
+                            dr <= 0;
                         end
                         else begin
                             d1 <= (op1[31] && !func[0]) ? ~op1 + 32'd1 : op1;
                             d2 <= {1'b0, (op2[31] && !func[0]) ? (~op2 + 32'd1) : op2, 31'd0};
                             state <= 4;
+                            dr <= 0;
                         end
                     end
                 end
@@ -93,9 +92,9 @@ module vigna_m_ext(
                     if (d2 == 0) begin
                         state <= 1;
                         ready <= 1;
-                        dr <= 0;
+                        dr <= {32'd0, op1};
                     end
-                    if (d2[63:32] == 0 && d1 > d2[31:0]) begin
+                    if (d2[63:32] == 0 && d1 >= d2[31:0]) begin
                         d1 <= d1 - d2[31:0];
                         dr[63:32] <= {dr[62:32], 1'b1};
                     end
@@ -107,7 +106,7 @@ module vigna_m_ext(
                         state <= 5;
                 end
                 5: begin
-                    dr[31:0] <= sign ? (~d1[31:0] + 32'd1) : d1[31:0];
+                    dr[31:0] <= op1[31] & is_rem ? (~d1[31:0] + 32'd1) : d1[31:0];
                     dr[63:32] <= sign ? (~dr[63:32] + 32'd1) : dr[63:32];
                     state <= 1;
                     ready <= 1;
