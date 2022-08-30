@@ -89,21 +89,28 @@ module vigna_m_ext(
                     ctr   <= 0;
                 end
                 4: begin
-                    if (d2 == 0) begin
+                    if (op2 == 0) begin
                         state <= 1;
                         ready <= 1;
-                        dr <= {32'd0, op1};
+                        dr <= {32'hffffffff, op1};
                     end
-                    if (d2[63:32] == 0 && d1 >= d2[31:0]) begin
-                        d1 <= d1 - d2[31:0];
-                        dr[63:32] <= {dr[62:32], 1'b1};
+                    else if ((is_div || is_rem) && (op1 == 32'h80000000) && (op2 == 32'hffffffff) ) begin
+                        state <= 1;
+                        ready <= 1;
+                        dr <= {32'h80000000, 32'h0};
                     end
-                    else 
-                        dr[63:32] <= {dr[62:32], 1'b0};
-                    d2 <= {1'b0, d2[63:1]};
-                    ctr <= ctr + 1;
-                    if (ctr == 5'd31) 
-                        state <= 5;
+                    else begin
+                        if (d2[63:32] == 0 && d1 >= d2[31:0]) begin
+                            d1 <= d1 - d2[31:0];
+                            dr[63:32] <= {dr[62:32], 1'b1};
+                        end
+                        else 
+                            dr[63:32] <= {dr[62:32], 1'b0};
+                        d2 <= {1'b0, d2[63:1]};
+                        ctr <= ctr + 1;
+                        if (ctr == 5'd31) 
+                            state <= 5;
+                    end
                 end
                 5: begin
                     dr[31:0] <= op1[31] & is_rem ? (~d1[31:0] + 32'd1) : d1[31:0];
