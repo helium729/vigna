@@ -1,12 +1,12 @@
 # VIGNA
 
-Vigna is a CPU core that implements [RISC-V RV32I Instruction Set](http://riscv.org).
+Vigna is a CPU core that implements [RISC-V Instruction Set](http://riscv.org). Current supported architecture is RV32I/E[M]
 
 Tools (gcc, binutils, etc..) can be obtained via the [RISC-V Website](https://riscv.org/software-status/)
 
-The current version is v1.07
+The current version is v1.21
 
-**Warning: This project is not fully tested yet, please use with caution in the real world!**
+This version is tested with `riscv-tests`, `dhrystone` and `coremark`.
 
 **If you find a bug or have any questions, you can create an issue.**
 
@@ -63,7 +63,9 @@ GPIOs based on the native bus.
 Module to get cycles(in 64-bits) after reset.
 
 #### uart.v
-The uart module for a 2-wire uart interface with a simple fifo buffer. Not finished yet.
+The uart module for a 2-wire uart interface with a simple fifo buffer.
+
+
 
 Memory Interface
 -----------------
@@ -105,6 +107,4 @@ See the [wiki](https://github.com/helium729/vigna/wiki) for details in the desig
 
 Future Plans
 ---------
-Current: add configurations on M extension
-
 Next: more documentation about design details.
