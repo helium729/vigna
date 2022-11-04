@@ -24,27 +24,59 @@ module bus2to1(
     output [ 3:0] s_wstrb
 );
 
-reg pull_down_reg = 1'b1;
+reg [1:0] state;
+reg rotate;
+
+assign s_valid = state != 2'b00;
 
 always @ (posedge clk) begin
-    if (!resetn) pull_down_reg <= 1'b1;
-    else if (m1_valid && m1_ready) pull_down_reg <= 1'b0;
-    else if (m2_valid && m2_ready) pull_down_reg <= 1'b0;
-    else pull_down_reg <= 1'b1;
+    if (resetn == 1'b0) begin
+        state <= 2'b00;
+        rotate <= 1'b0;
+    end else begin
+        if (s_ready) begin
+            case (state)
+                2'b00: begin
+                    if (m1_valid & m2_valid) begin
+                        if (rotate) begin
+                            state <= 2'b10;
+                        end else begin
+                            state <= 2'b01;
+                        end
+                        rotate <= ~rotate;
+                    end
+                    else if (m1_valid) begin
+                        state <= 2'b01;
+                    end
+                    else if (m2_valid) begin
+                        state <= 2'b10;
+                    end
+                end
+                2'b01: begin
+                    if (m2_valid) begin
+                        state <= 2'b10;
+                    end else begin
+                        state <= 2'b00;
+                    end
+                end
+                2'b10: begin
+                    if (m1_valid) begin
+                        state <= 2'b01;
+                    end else begin
+                        state <= 2'b00;
+                    end
+                end
+                2'b11: begin
+                    //fault
+                    state <= 2'b00;
+                end
+            endcase
+        end
+    end
 end
 
-assign s_valid = pull_down_reg & (m1_valid | m2_valid);
-
-//rs logic
-wire rs_m1;
-wire rs_m2;
-wire rs_qm1;
-wire rs_qm2;
-assign rs_qm1 = ~(rs_qm2 & rs_m2);
-assign rs_qm2 = ~(rs_qm1 & rs_m1);
-
-assign rs_m1 = (!m1_valid && !m2_valid) ? 1'b1 : m1_valid;
-assign rs_m2 = (!m1_valid && !m2_valid) ? 1'b1 : m2_valid;
+assign rs_qm1 = state == 2'b01;
+assign rs_qm2 = state == 2'b10;
 
 assign m1_ready = rs_qm1 ? s_ready : 1'b0;
 assign m2_ready = rs_qm2 ? s_ready : 1'b0;
