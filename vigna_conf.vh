@@ -59,4 +59,10 @@
 
 `define VIGNA_CORE_M_EXTENSION
 
+//ToDo
+//`define VIGNA_CORE_M_FPGA_FAST
+
+//ToDo
+//`define VIGNA_CORE_INTERRUPT
+
 `endif
