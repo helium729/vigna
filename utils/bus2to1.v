@@ -25,53 +25,27 @@ module bus2to1(
 );
 
 reg [1:0] state;
-reg rotate;
-
-assign s_valid = state != 2'b00;
 
 always @ (posedge clk) begin
     if (resetn == 1'b0) begin
-        state <= 2'b00;
-        rotate <= 1'b0;
+        state <= 2'b01;
     end else begin
-        if (s_ready) begin
-            case (state)
-                2'b00: begin
-                    if (m1_valid & m2_valid) begin
-                        if (rotate) begin
-                            state <= 2'b10;
-                        end else begin
-                            state <= 2'b01;
-                        end
-                        rotate <= ~rotate;
-                    end
-                    else if (m1_valid) begin
-                        state <= 2'b01;
-                    end
-                    else if (m2_valid) begin
-                        state <= 2'b10;
-                    end
+        case (state)
+            2'b01: begin
+                if (m2_valid & (~m1_valid)) begin
+                    state <= 2'b10;
                 end
-                2'b01: begin
-                    if (m2_valid) begin
-                        state <= 2'b10;
-                    end else begin
-                        state <= 2'b00;
-                    end
+            end
+            2'b10: begin
+                if (m1_valid & (~m2_valid)) begin
+                    state <= 2'b01;
                 end
-                2'b10: begin
-                    if (m1_valid) begin
-                        state <= 2'b01;
-                    end else begin
-                        state <= 2'b00;
-                    end
-                end
-                2'b11: begin
-                    //fault
-                    state <= 2'b00;
-                end
-            endcase
-        end
+            end
+            default: begin 
+                state <= 2'b01;
+            end
+        endcase
+        
     end
 end
 
@@ -88,5 +62,8 @@ assign s_wdata  = rs_qm1 ? m1_wdata :
                   rs_qm2 ? m2_wdata : 32'h0;
 assign s_wstrb  = rs_qm1 ? m1_wstrb : 
                   rs_qm2 ? m2_wstrb : 4'h0;
+assign s_valid  = rs_qm1 ? m1_valid :
+                  rs_qm2 ? m2_valid : 1'b0;
+
 
 endmodule
