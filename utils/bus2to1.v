@@ -26,7 +26,7 @@ module bus2to1(
 
 reg [1:0] state;
 
-always @ (posedge clk) begin
+always @ (negedge clk) begin
     if (resetn == 1'b0) begin
         state <= 2'b01;
     end else begin
