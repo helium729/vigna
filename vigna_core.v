@@ -354,6 +354,7 @@ wire is_jump = is_jal || is_jalr;
     );
 `endif
 
+
 //part2. executon unit
 always @ (posedge clk) begin
     //reset logic
@@ -454,14 +455,25 @@ always @ (posedge clk) begin
                 //load/store func
                 if (!write_mem) begin
                     d_valid    <= 1;
-                    d_addr     <= dr;
+                    `ifdef VIGNA_CORE_ALIGNMENT 
+                        d_addr <= dr & 32'hfffffffc;
+                        shift_cnt <= dr[1:0];
+                    `else
+                        d_addr <= dr;  
+                    `endif
                     d_wstrb    <= 0;
                     exec_state <= 4'b0011;
                 end else begin
                     d_valid    <= 1;
-                    d_addr     <= dr;
-                    d_wdata    <= d3;
-                    d_wstrb    <= ls_strb;
+                    `ifdef VIGNA_CORE_ALIGNMENT 
+                        d_addr <= dr & 32'hfffffffc;
+                        shift_cnt[1:0] <= dr[1:0];
+                        d_wdata    <= d3 << ({3'b000, dr[1:0]} << 3);
+                    `else
+                        d_addr <= dr;  
+                        d_wdata    <= d3;
+                    `endif
+                    d_wstrb    <= ls_strb << dr[1:0];
                     exec_state <= 4'b0101;
                 end
             end
@@ -491,10 +503,23 @@ always @ (posedge clk) begin
                     exec_state <= 0;
                     d_valid    <= 0;
                     if (wb_reg != 0) begin
-                        if      (!ls_sign_extend)    cpu_regs[wb_reg] <= d_rdata & {{8{ls_strb[3]}}, {8{ls_strb[2]}}, {8{ls_strb[1]}}, {8{ls_strb[0]}}};
-                        else if (ls_strb == 4'b0001) cpu_regs[wb_reg] <= {{24{d_rdata[7]}}, d_rdata[7:0]};
-                        else if (ls_strb == 4'b0011) cpu_regs[wb_reg] <= {{16{d_rdata[15]}}, d_rdata[15:0]};
-                        else                         cpu_regs[wb_reg] <= d_rdata;
+                        `ifdef VIGNA_CORE_ALIGNMENT
+                            case ({shift_cnt[1:0], ls_strb})
+                                6'b000001: cpu_regs[wb_reg] <= {ls_sign_extend ? {24{d_rdata[ 7]}} : 24'd0, d_rdata[ 7: 0]};
+                                6'b010010: cpu_regs[wb_reg] <= {ls_sign_extend ? {24{d_rdata[15]}} : 24'd0, d_rdata[15: 8]};
+                                6'b100100: cpu_regs[wb_reg] <= {ls_sign_extend ? {24{d_rdata[23]}} : 24'd0, d_rdata[23:16]};
+                                6'b111000: cpu_regs[wb_reg] <= {ls_sign_extend ? {24{d_rdata[31]}} : 24'd0, d_rdata[31:24]};
+                                6'b000011: cpu_regs[wb_reg] <= {ls_sign_extend ? {16{d_rdata[15]}} : 16'd0, d_rdata[15: 0]};
+                                6'b101100: cpu_regs[wb_reg] <= {ls_sign_extend ? {16{d_rdata[31]}} : 16'd0, d_rdata[31:16]};
+                                6'b001111: cpu_regs[wb_reg] <= d_rdata;
+                                default: cpu_regs[wb_reg] <= 32'd0;
+                            endcase
+                        `else 
+                            if      (!ls_sign_extend)    cpu_regs[wb_reg] <= d_rdata & {{8{ls_strb[3]}}, {8{ls_strb[2]}}, {8{ls_strb[1]}}, {8{ls_strb[0]}}};
+                            else if (ls_strb == 4'b0001) cpu_regs[wb_reg] <= {{24{d_rdata[7]}}, d_rdata[7:0]};
+                            else if (ls_strb == 4'b0011) cpu_regs[wb_reg] <= {{16{d_rdata[15]}}, d_rdata[15:0]};
+                            else                         cpu_regs[wb_reg] <= d_rdata;
+                        `endif      
                     end
                 end
             end

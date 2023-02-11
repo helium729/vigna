@@ -65,4 +65,6 @@
 //ToDo
 //`define VIGNA_CORE_INTERRUPT
 
+`define VIGNA_CORE_ALIGNMENT
+
 `endif
