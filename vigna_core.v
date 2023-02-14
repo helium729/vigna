@@ -469,11 +469,12 @@ always @ (posedge clk) begin
                         d_addr <= dr & 32'hfffffffc;
                         shift_cnt[1:0] <= dr[1:0];
                         d_wdata    <= d3 << ({3'b000, dr[1:0]} << 3);
+                        d_wstrb    <= ls_strb << dr[1:0];
                     `else
                         d_addr <= dr;  
                         d_wdata    <= d3;
+                        d_wstrb    <= ls_strb;
                     `endif
-                    d_wstrb    <= ls_strb << dr[1:0];
                     exec_state <= 4'b0101;
                 end
             end
@@ -506,11 +507,11 @@ always @ (posedge clk) begin
                         `ifdef VIGNA_CORE_ALIGNMENT
                             case ({shift_cnt[1:0], ls_strb})
                                 6'b000001: cpu_regs[wb_reg] <= {ls_sign_extend ? {24{d_rdata[ 7]}} : 24'd0, d_rdata[ 7: 0]};
-                                6'b010010: cpu_regs[wb_reg] <= {ls_sign_extend ? {24{d_rdata[15]}} : 24'd0, d_rdata[15: 8]};
-                                6'b100100: cpu_regs[wb_reg] <= {ls_sign_extend ? {24{d_rdata[23]}} : 24'd0, d_rdata[23:16]};
-                                6'b111000: cpu_regs[wb_reg] <= {ls_sign_extend ? {24{d_rdata[31]}} : 24'd0, d_rdata[31:24]};
+                                6'b010001: cpu_regs[wb_reg] <= {ls_sign_extend ? {24{d_rdata[15]}} : 24'd0, d_rdata[15: 8]};
+                                6'b100001: cpu_regs[wb_reg] <= {ls_sign_extend ? {24{d_rdata[23]}} : 24'd0, d_rdata[23:16]};
+                                6'b110001: cpu_regs[wb_reg] <= {ls_sign_extend ? {24{d_rdata[31]}} : 24'd0, d_rdata[31:24]};
                                 6'b000011: cpu_regs[wb_reg] <= {ls_sign_extend ? {16{d_rdata[15]}} : 16'd0, d_rdata[15: 0]};
-                                6'b101100: cpu_regs[wb_reg] <= {ls_sign_extend ? {16{d_rdata[31]}} : 16'd0, d_rdata[31:16]};
+                                6'b100011: cpu_regs[wb_reg] <= {ls_sign_extend ? {16{d_rdata[31]}} : 16'd0, d_rdata[31:16]};
                                 6'b001111: cpu_regs[wb_reg] <= d_rdata;
                                 default: cpu_regs[wb_reg] <= 32'd0;
                             endcase
