@@ -23,9 +23,11 @@ This version is tested with `riscv-tests`, `dhrystone` and `coremark`.
 
 Features and Typical Applications
 --------------------------------
-Vigna is a two-stage pipelined micro-controller style CPU. The core has an approximate CPI of 3 when the instruction bus and data bus are separated. The micro-controller is size-optimized and has a simple extensible bus.
+Vigna is a two-stage micro-controller style CPU with parallele state-machine architecture. The core has an approximate CPI of 3 when the instruction bus and data bus are separated. The micro-controller is size-optimized and has a simple extensible bus.
 
 This core can be integrated into other systems and used as an auxiliary core on a FPGA. Due to the small size and low logic payload, it can be easily adapted into various systems.
+
+This core has a ultra-low size on FPGAs. On Xilinx Artix-7 series FPGAs, it only uses 582 LUTs and 285FFs(Synthesized with Xilinx Vivado 2020.1 with default synthesis strategy).
 
 Files in this Repository
 -----------------
