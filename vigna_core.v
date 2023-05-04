@@ -42,15 +42,6 @@ module vigna(
     input      [31:0] d_rdata,
     output reg [31:0] d_wdata,
     output reg [ 3:0] d_wstrb
-`ifdef VIGNA_M_EXTENSION
-    ,
-    output        mext_valid,
-    input         mext_ready,
-    output [2:0]  mext_func,
-    output [31:0] mext_op1,
-    output [31:0] mext_op2,
-    input  [31:0] mext_result
-`endif 
 );
 
 //program counter
@@ -402,7 +393,6 @@ always @ (posedge clk) begin
                     `ifdef VIGNA_CORE_M_EXTENSION
                     end else if (is_m_coproc) begin 
                         d3[2:0] <= funct3;
-
                         m_valid   <= 1;
                     `endif
                     end
@@ -567,7 +557,7 @@ end
 wire is_branch;
 assign is_branch = is_beq || is_bne || is_blt || is_bge || is_bltu || is_bgeu;
 
-assign fetch_received = (exec_state == 4'b0000 && !is_jump && !is_branch)
+assign fetch_received = (exec_state == 4'b0000 && !is_jump && !is_branch)+
                         || (exec_state == 4'b0100)
                         || (exec_state == 4'b1000);
 
