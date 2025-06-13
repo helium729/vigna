@@ -364,6 +364,15 @@ always @ (posedge clk) begin
         write_mem      <= 0;
         ls_strb        <= 0;
         ls_sign_extend <= 0;
+        // Reset all CPU registers to 0
+        `ifdef VIGNA_CORE_E_EXTENSION
+            for (integer i = 1; i <= 15; i = i + 1)
+                cpu_regs[i] <= 32'd0;
+        `else
+            for (integer i = 1; i <= 31; i = i + 1)
+                cpu_regs[i] <= 32'd0;
+        `endif
+        
         `ifdef VIGNA_CORE_STACK_ADDR_RESET_ENABLE
             cpu_regs[2] <= `VIGNA_CORE_STACK_ADDR_RESET_VALUE;
         `endif
@@ -557,7 +566,7 @@ end
 wire is_branch;
 assign is_branch = is_beq || is_bne || is_blt || is_bge || is_bltu || is_bgeu;
 
-assign fetch_received = (exec_state == 4'b0000 && !is_jump && !is_branch)+
+assign fetch_received = (exec_state == 4'b0000 && !is_jump && !is_branch)
                         || (exec_state == 4'b0100)
                         || (exec_state == 4'b1000);
 
