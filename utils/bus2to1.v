@@ -24,46 +24,113 @@ module bus2to1(
     output [ 3:0] s_wstrb
 );
 
-reg [1:0] state;
+// Arbitration state and control
+reg [1:0] arb_state;
+reg [1:0] arb_next_state;
+reg grant_m1, grant_m2;
 
-always @ (negedge clk) begin
-    if (resetn == 1'b0) begin
-        state <= 2'b01;
+// Output buffering for better timing
+reg [31:0] m1_rdata_reg, m2_rdata_reg;
+reg m1_rdata_valid, m2_rdata_valid;
+
+// Round-robin arbitration counter for fairness
+reg fair_toggle;
+
+// Arbitration logic - improved with round-robin fairness
+always @(*) begin
+    arb_next_state = arb_state;
+    grant_m1 = 1'b0;
+    grant_m2 = 1'b0;
+    
+    case (arb_state)
+        2'b00: begin // IDLE state
+            if (m1_valid && m2_valid) begin
+                // Both requesting - use fair arbitration
+                if (fair_toggle) begin
+                    arb_next_state = 2'b10; // Grant M2
+                    grant_m2 = 1'b1;
+                end else begin
+                    arb_next_state = 2'b01; // Grant M1
+                    grant_m1 = 1'b1;
+                end
+            end else if (m1_valid) begin
+                arb_next_state = 2'b01; // Grant M1
+                grant_m1 = 1'b1;
+            end else if (m2_valid) begin
+                arb_next_state = 2'b10; // Grant M2
+                grant_m2 = 1'b1;
+            end
+        end
+        2'b01: begin // M1 granted
+            grant_m1 = 1'b1;
+            if (m1_valid && s_ready) begin
+                arb_next_state = 2'b00; // Transaction complete
+            end else if (!m1_valid) begin
+                arb_next_state = 2'b00; // M1 released
+            end
+        end
+        2'b10: begin // M2 granted
+            grant_m2 = 1'b1;
+            if (m2_valid && s_ready) begin
+                arb_next_state = 2'b00; // Transaction complete
+            end else if (!m2_valid) begin
+                arb_next_state = 2'b00; // M2 released
+            end
+        end
+        default: begin
+            arb_next_state = 2'b00;
+        end
+    endcase
+end
+
+// Sequential logic - using posedge for better timing
+always @(posedge clk) begin
+    if (!resetn) begin
+        arb_state <= 2'b00;
+        fair_toggle <= 1'b0;
+        m1_rdata_reg <= 32'h0;
+        m2_rdata_reg <= 32'h0;
+        m1_rdata_valid <= 1'b0;
+        m2_rdata_valid <= 1'b0;
     end else begin
-        case (state)
-            2'b01: begin
-                if (m2_valid & (~m1_valid)) begin
-                    state <= 2'b10;
-                end
-            end
-            2'b10: begin
-                if (m1_valid & (~m2_valid)) begin
-                    state <= 2'b01;
-                end
-            end
-            default: begin 
-                state <= 2'b01;
-            end
-        endcase
+        arb_state <= arb_next_state;
         
+        // Update fairness toggle when both masters compete
+        if (arb_state == 2'b00 && m1_valid && m2_valid) begin
+            fair_toggle <= ~fair_toggle;
+        end
+        
+        // Buffer read data to break combinational loops
+        if (grant_m1 && s_ready && !m1_wstrb) begin
+            m1_rdata_reg <= s_rdata;
+            m1_rdata_valid <= 1'b1;
+        end else if (!m1_valid) begin
+            m1_rdata_valid <= 1'b0;
+        end
+        
+        if (grant_m2 && s_ready && !m2_wstrb) begin
+            m2_rdata_reg <= s_rdata;
+            m2_rdata_valid <= 1'b1;
+        end else if (!m2_valid) begin
+            m2_rdata_valid <= 1'b0;
+        end
     end
 end
 
-assign rs_qm1 = state == 2'b01;
-assign rs_qm2 = state == 2'b10;
+// Output assignments - fixed blocking issues
+assign m1_ready = grant_m1 & s_ready;
+assign m2_ready = grant_m2 & s_ready;
 
-assign m1_ready = rs_qm1 ? s_ready : 1'b0;
-assign m2_ready = rs_qm2 ? s_ready : 1'b0;
-assign s_addr   = rs_qm1 ? m1_addr :
-                  rs_qm2 ? m2_addr : 32'h0;
-assign m1_rdata = rs_qm1 ? s_rdata : m1_rdata;
-assign m2_rdata = rs_qm2 ? s_rdata : m2_rdata;
-assign s_wdata  = rs_qm1 ? m1_wdata :
-                  rs_qm2 ? m2_wdata : 32'h0;
-assign s_wstrb  = rs_qm1 ? m1_wstrb : 
-                  rs_qm2 ? m2_wstrb : 4'h0;
-assign s_valid  = rs_qm1 ? m1_valid :
-                  rs_qm2 ? m2_valid : 1'b0;
+assign s_valid = (grant_m1 & m1_valid) | (grant_m2 & m2_valid);
+assign s_addr  = grant_m1 ? m1_addr : 
+                 grant_m2 ? m2_addr : 32'h0;
+assign s_wdata = grant_m1 ? m1_wdata :
+                 grant_m2 ? m2_wdata : 32'h0;
+assign s_wstrb = grant_m1 ? m1_wstrb :
+                 grant_m2 ? m2_wstrb : 4'h0;
 
+// Fixed read data assignments - no more combinational loops
+assign m1_rdata = m1_rdata_valid ? m1_rdata_reg : 32'h0;
+assign m2_rdata = m2_rdata_valid ? m2_rdata_reg : 32'h0;
 
 endmodule
