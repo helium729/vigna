@@ -67,4 +67,12 @@
 
 `define VIGNA_CORE_ALIGNMENT
 
+/*--------------------------------------------------------------------------*/
+
+/* AXI-Lite bus interface option
+ * uncomment this line to enable AXI4-Lite interface instead of simple interface
+ * when enabled, use vigna_axi module instead of vigna module */
+
+//`define VIGNA_AXI_LITE_INTERFACE
+
 `endif
