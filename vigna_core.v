@@ -557,7 +557,7 @@ end
 wire is_branch;
 assign is_branch = is_beq || is_bne || is_blt || is_bge || is_bltu || is_bgeu;
 
-assign fetch_received = (exec_state == 4'b0000 && !is_jump && !is_branch)+
+assign fetch_received = (exec_state == 4'b0000 && !is_jump && !is_branch)
                         || (exec_state == 4'b0100)
                         || (exec_state == 4'b1000);
 
