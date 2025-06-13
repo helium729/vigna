@@ -7,11 +7,9 @@ GTKWAVE = gtkwave
 
 # Directories
 SIM_DIR = sim
-UTILS_DIR = utils
 
 # Source files
 CORE_SOURCES = vigna_core.v vigna_conf.vh
-UTILS_SOURCES = $(UTILS_DIR)/bus2to1.v
 SIM_SOURCES = $(SIM_DIR)/mem_sim.v
 
 # Test targets
@@ -29,16 +27,16 @@ COMPREHENSIVE_VCD_FILE = $(SIM_DIR)/comprehensive_processor_test.vcd
 all: comprehensive_test
 
 # Compile basic testbench
-$(VVP_FILE): $(CORE_SOURCES) $(UTILS_SOURCES) $(SIM_DIR)/$(TESTBENCH).v
-	$(IVERILOG) -o $(VVP_FILE) -I. -I$(UTILS_DIR) $(CORE_SOURCES) $(UTILS_SOURCES) $(SIM_DIR)/$(TESTBENCH).v
+$(VVP_FILE): $(CORE_SOURCES) $(SIM_DIR)/$(TESTBENCH).v
+	$(IVERILOG) -o $(VVP_FILE) -I. $(CORE_SOURCES) $(SIM_DIR)/$(TESTBENCH).v
 
 # Compile enhanced testbench
-$(ENHANCED_VVP_FILE): $(CORE_SOURCES) $(UTILS_SOURCES) $(SIM_DIR)/$(ENHANCED_TESTBENCH).v
-	$(IVERILOG) -o $(ENHANCED_VVP_FILE) -I. -I$(UTILS_DIR) $(CORE_SOURCES) $(UTILS_SOURCES) $(SIM_DIR)/$(ENHANCED_TESTBENCH).v
+$(ENHANCED_VVP_FILE): $(CORE_SOURCES) $(SIM_DIR)/$(ENHANCED_TESTBENCH).v
+	$(IVERILOG) -o $(ENHANCED_VVP_FILE) -I. $(CORE_SOURCES) $(SIM_DIR)/$(ENHANCED_TESTBENCH).v
 
 # Compile comprehensive testbench
-$(COMPREHENSIVE_VVP_FILE): $(CORE_SOURCES) $(UTILS_SOURCES) $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).v
-	$(IVERILOG) -o $(COMPREHENSIVE_VVP_FILE) -I. -I$(UTILS_DIR) $(CORE_SOURCES) $(UTILS_SOURCES) $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).v
+$(COMPREHENSIVE_VVP_FILE): $(CORE_SOURCES) $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).v
+	$(IVERILOG) -o $(COMPREHENSIVE_VVP_FILE) -I. $(CORE_SOURCES) $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).v
 
 # Run basic simulation
 test: $(VVP_FILE)
@@ -64,13 +62,13 @@ comprehensive_wave: $(COMPREHENSIVE_VCD_FILE)
 
 # Syntax check
 syntax:
-	$(IVERILOG) -t null -I. -I$(UTILS_DIR) $(CORE_SOURCES) $(UTILS_SOURCES) $(SIM_DIR)/$(TESTBENCH).v
+	$(IVERILOG) -t null -I. $(CORE_SOURCES) $(SIM_DIR)/$(TESTBENCH).v
 
 enhanced_syntax:
-	$(IVERILOG) -t null -I. -I$(UTILS_DIR) $(CORE_SOURCES) $(UTILS_SOURCES) $(SIM_DIR)/$(ENHANCED_TESTBENCH).v
+	$(IVERILOG) -t null -I. $(CORE_SOURCES) $(SIM_DIR)/$(ENHANCED_TESTBENCH).v
 
 comprehensive_syntax:
-	$(IVERILOG) -t null -I. -I$(UTILS_DIR) $(CORE_SOURCES) $(UTILS_SOURCES) $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).v
+	$(IVERILOG) -t null -I. $(CORE_SOURCES) $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).v
 
 # Clean generated files
 clean:
@@ -78,17 +76,17 @@ clean:
 
 # Quick test without waveform dumping
 quick_test:
-	$(IVERILOG) -o /tmp/test.vvp -I. -I$(UTILS_DIR) $(CORE_SOURCES) $(UTILS_SOURCES) $(SIM_DIR)/$(TESTBENCH).v
+	$(IVERILOG) -o /tmp/test.vvp -I. $(CORE_SOURCES) $(SIM_DIR)/$(TESTBENCH).v
 	$(VVP) /tmp/test.vvp
 	rm -f /tmp/test.vvp
 
 enhanced_quick_test:
-	$(IVERILOG) -o /tmp/enhanced_test.vvp -I. -I$(UTILS_DIR) $(CORE_SOURCES) $(UTILS_SOURCES) $(SIM_DIR)/$(ENHANCED_TESTBENCH).v
+	$(IVERILOG) -o /tmp/enhanced_test.vvp -I. $(CORE_SOURCES) $(SIM_DIR)/$(ENHANCED_TESTBENCH).v
 	$(VVP) /tmp/enhanced_test.vvp
 	rm -f /tmp/enhanced_test.vvp
 
 comprehensive_quick_test:
-	$(IVERILOG) -o /tmp/comprehensive_test.vvp -I. -I$(UTILS_DIR) $(CORE_SOURCES) $(UTILS_SOURCES) $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).v
+	$(IVERILOG) -o /tmp/comprehensive_test.vvp -I. $(CORE_SOURCES) $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).v
 	$(VVP) /tmp/comprehensive_test.vvp
 	rm -f /tmp/comprehensive_test.vvp
 
