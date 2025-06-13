@@ -4,9 +4,9 @@ Vigna is a CPU core that implements [RISC-V Instruction Set](http://riscv.org). 
 
 Tools (gcc, binutils, etc..) can be obtained via the [RISC-V Website](https://riscv.org/software-status/)
 
-The current version is v1.21
+The current version is v1.09
 
-This version is tested with `riscv-tests`, `dhrystone` and `coremark`.
+This version includes a comprehensive test suite with enhanced processor testbenches that verify instruction execution, arithmetic operations, memory operations, and more.
 
 **If you find a bug or have any questions, you can create an issue.**
 
@@ -17,6 +17,7 @@ This version is tested with `riscv-tests`, `dhrystone` and `coremark`.
 
 - [Features and Typical Applications](#features-and-typical-applications)
 - [Files in this Repository](#files-in-this-repository)
+- [Testing](#testing)
 - [Memory Interface](#memory-interface)
 - [Design Details](#design-details)
 - [Future Plans](#future-plans)
@@ -35,39 +36,76 @@ Files in this Repository
 You are reading it right now.
 
 #### vigna_core.v
-This Verilog file contains module `vigna`, which is the design rtl code of the core.
+This Verilog file contains module `vigna`, which is the design RTL code of the core.
 
-#### vigna_top.v
-This Verilog file contains module `vigna_top`, which is a wrapper of vigna core.
+#### vigna_coproc.v
+This Verilog file contains the coprocessor module for M extension support (multiplication and division operations).
 
-#### vigna_conf.v
-This Verilog file defines the configurations of core vigna.
+#### vigna_conf.vh
+This Verilog header file defines the configurations of core vigna, including extension enables, bus binding options, and core parameters.
+
+#### TESTS.md
+Documentation explaining the comprehensive test programs created for the Vigna processor, including detailed coverage of RISC-V instruction testing.
+
+#### Makefile
+Build system that provides targets for compiling, running tests, syntax checking, and waveform generation for the processor testbenches.
+
+#### sim/
+Directory containing comprehensive test suites for the Vigna RISC-V processor core:
+
+##### sim/processor_testbench.v
+Basic testbench that exercises various instruction types and monitors execution.
+
+##### sim/enhanced_processor_testbench.v
+Enhanced testbench with result verification through memory stores, testing arithmetic operations, immediate operations, load/store operations, and comparison operations.
+
+##### sim/comprehensive_processor_testbench.v
+Comprehensive testbench that adds shift operations, upper immediate operations, and branch operations.
+
+##### sim/mem_sim.v
+Memory simulator module that provides instruction and data memory interfaces for testbenches.
+
+##### sim/README.md
+Detailed documentation for the test suite, including build instructions, test descriptions, and usage examples.
 
 
-#### Utils
-This directory contains MISC files for adaptions on different platforms.
-Design files including gpio and AXI4-Lite adapters are in this directory.
 
+Testing
+-------
+The Vigna processor includes a comprehensive test suite located in the `sim/` directory. The test infrastructure provides verification of RISC-V instruction execution through multiple testbench levels:
 
-##### axi_adapter
-This Verilog file contains a module that adapts current bus into an AXI4-Lite bus interface. This adapter can be used with module vigna or vigna_top.
+### Requirements
+- Icarus Verilog (iverilog) for simulation
+- GTKWave for waveform viewing (optional)
+- Make for build automation
 
-##### bus2to1.v
-This Verilog file contains a module that merge 2 bus interfaces into one. This module uses a simple RS-latch logic. It is possible that warnings mignt occure when using linters like verilator or when synthesizing using yosys, but it should workout fine on FPGAs. If it turned out to be an error that cannot be solved, try fixing this by replacing the RS-latch logic with primitives.
+### Running Tests
+```bash
+# Quick tests (no waveform generation)
+make enhanced_quick_test
+make comprehensive_quick_test
 
-#### bus1to2.v
-A bus routing module that decide which way the bus signals should go with the accessing address. This module is recommanded to connect multiple slave devices and MMIOs.
+# Full tests with waveform generation
+make enhanced_test
+make comprehensive_test
 
-#### gpio.v
-GPIOs based on the native bus.
+# Syntax checking
+make enhanced_syntax
+make comprehensive_syntax
+```
 
-#### timer.v
-Module to get cycles(in 64-bits) after reset.
+### Test Coverage
+The test suite covers:
+- All basic RISC-V RV32I instructions
+- Arithmetic and logical operations (ADD, SUB, AND, OR, XOR, SLT)
+- Immediate operations (ADDI, ANDI, ORI, XORI, SLTI)
+- Memory operations (LW, SW)
+- Shift operations (SLLI, SRLI, SRAI)
+- Upper immediate operations (LUI, AUIPC)
+- Branch operations (BEQ, BNE, etc.)
+- M extension operations (if enabled)
 
-#### uart.v
-The uart module for a 2-wire uart interface with a simple fifo buffer.
-
-
+For detailed test documentation, see `TESTS.md` and `sim/README.md`.
 
 Memory Interface
 -----------------
@@ -109,4 +147,8 @@ See the [wiki](https://github.com/helium729/vigna/wiki) for details in the desig
 
 Future Plans
 ---------
-Next: more documentation about design details.
+- Enhanced documentation about design details
+- Additional utility modules (GPIO, UART, Timer, Bus adapters)
+- AXI4-Lite bus interface adapter
+- Interrupt support implementation
+- Performance optimizations
