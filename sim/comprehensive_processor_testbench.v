@@ -285,8 +285,8 @@ module comprehensive_processor_testbench();
             // ADDI x2, x0, 10     // x2 = 10 (equal for BEQ test)
             instruction_memory[1] = make_i_type(12'd10, 5'd0, 3'b000, 5'd2, 7'b0010011);
             
-            // BEQ x1, x2, 8       // Branch if equal (should branch to instruction 5)
-            instruction_memory[2] = make_b_type(13'd8, 5'd2, 5'd1, 3'b000, 7'b1100011);
+            // BEQ x1, x2, 12      // Branch if equal (should branch to instruction 5)
+            instruction_memory[2] = make_b_type(13'd12, 5'd2, 5'd1, 3'b000, 7'b1100011);
             
             // ADDI x3, x0, 99     // This should be skipped
             instruction_memory[3] = make_i_type(12'd99, 5'd0, 3'b000, 5'd3, 7'b0010011);
