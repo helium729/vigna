@@ -141,6 +141,67 @@ write immediately  with `ready` going high in the same cycle as `valid`.
 
 For more examples and explainations, goto [wiki](https://github.com/helium729/vigna/wiki).
 
+AXI4-Lite Interface
+-------------------
+The Vigna processor now supports an optional AXI4-Lite interface as an alternative to the simple memory interface. The AXI4-Lite interface provides industry-standard connectivity for integration into larger SoC designs.
+
+#### Using AXI4-Lite Interface
+
+To use the AXI4-Lite interface:
+
+1. Uncomment `#define VIGNA_AXI_LITE_INTERFACE` in `vigna_conf.vh` (optional - for documentation)
+2. Use the `vigna_axi` module instead of the `vigna` module:
+
+```verilog
+vigna_axi processor (
+    .clk(clk),
+    .resetn(resetn),
+    
+    // AXI4-Lite Instruction Read Interface
+    .i_arvalid(i_arvalid),
+    .i_arready(i_arready),
+    .i_araddr(i_araddr),
+    .i_arprot(i_arprot),
+    .i_rvalid(i_rvalid),
+    .i_rready(i_rready),
+    .i_rdata(i_rdata),
+    .i_rresp(i_rresp),
+    
+    // AXI4-Lite Data Interface
+    .d_arvalid(d_arvalid), .d_arready(d_arready), .d_araddr(d_araddr), .d_arprot(d_arprot),
+    .d_rvalid(d_rvalid), .d_rready(d_rready), .d_rdata(d_rdata), .d_rresp(d_rresp),
+    .d_awvalid(d_awvalid), .d_awready(d_awready), .d_awaddr(d_awaddr), .d_awprot(d_awprot),
+    .d_wvalid(d_wvalid), .d_wready(d_wready), .d_wdata(d_wdata), .d_wstrb(d_wstrb),
+    .d_bvalid(d_bvalid), .d_bready(d_bready), .d_bresp(d_bresp)
+);
+```
+
+#### Interface Comparison
+
+| Feature | Simple Interface | AXI4-Lite Interface |
+|---------|------------------|---------------------|
+| **Standards Compliance** | Custom Wishbone-like | Industry Standard AXI4-Lite |
+| **Integration** | Simple, direct connection | Standard SoC interconnects |
+| **Latency** | Single cycle (zero wait-state) | Multi-cycle (address + data phases) |
+| **Area** | Minimal | Moderate (wrapper overhead) |
+| **Use Case** | Small systems, direct memory | SoC integration, standard interconnects |
+
+#### Testing AXI4-Lite Interface
+
+Run the AXI-specific tests to verify functionality:
+
+```bash
+make axi_test        # Run AXI4-Lite testbench
+make axi_syntax      # Check AXI code syntax
+```
+
+#### Compatibility
+
+- The original `vigna` module with simple interface remains unchanged and fully supported
+- Both interfaces can be used in the same project for different instances
+- All existing functionality and performance characteristics are preserved
+- The AXI wrapper adds approximately ~200 LUTs of overhead
+
 Design Details
 ------------
 See the [wiki](https://github.com/helium729/vigna/wiki) for details in the design.
@@ -149,6 +210,6 @@ Future Plans
 ---------
 - Enhanced documentation about design details
 - Additional utility modules (GPIO, UART, Timer, Bus adapters)
-- AXI4-Lite bus interface adapter
+- ~~AXI4-Lite bus interface adapter~~ ✅ **Completed**
 - Interrupt support implementation
 - Performance optimizations

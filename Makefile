@@ -29,6 +29,9 @@ AXI_VCD_FILE = $(SIM_DIR)/vigna_axi_test.vcd
 # Default target
 all: comprehensive_test
 
+# Test all interfaces
+test_all: comprehensive_test axi_test
+
 # Compile basic testbench
 $(VVP_FILE): $(CORE_SOURCES) $(SIM_DIR)/$(TESTBENCH).v
 	$(IVERILOG) -o $(VVP_FILE) -I. $(CORE_SOURCES) $(SIM_DIR)/$(TESTBENCH).v
@@ -112,4 +115,4 @@ axi_quick_test:
 	$(VVP) /tmp/axi_test.vvp
 	rm -f /tmp/axi_test.vvp
 
-.PHONY: all test enhanced_test comprehensive_test axi_test wave enhanced_wave comprehensive_wave axi_wave syntax enhanced_syntax comprehensive_syntax axi_syntax clean quick_test enhanced_quick_test comprehensive_quick_test axi_quick_test
+.PHONY: all test_all test enhanced_test comprehensive_test axi_test wave enhanced_wave comprehensive_wave axi_wave syntax enhanced_syntax comprehensive_syntax axi_syntax clean quick_test enhanced_quick_test comprehensive_quick_test axi_quick_test
