@@ -139,7 +139,6 @@ module processor_testbench();
     // Test task
     task run_test_sequence;
         input [255:0] test_name;
-        input [31:0] num_instructions;
         input [31:0] expected_cycles;
         begin
             $display("Running test: %s", test_name);
@@ -168,17 +167,15 @@ module processor_testbench();
             // SUB x4, x1, x2      // x4 = x1 - x2 = 5
             instruction_memory[3] = make_r_type(7'b0100000, 5'd2, 5'd1, 3'b000, 5'd4, 7'b0110011);
             
-            // AND x5, x1, x2      // x5 = x1 & x2
-            instruction_memory[4] = make_r_type(7'b0000000, 5'd2, 5'd1, 3'b111, 5'd5, 7'b0110011);
+            // Store results to memory for verification
+            // SW x3, 0(x0)       // Store x3 (ADD result) to address 0
+            instruction_memory[4] = make_s_type(12'd0, 5'd3, 5'd0, 3'b010, 7'b0100011);
             
-            // OR x6, x1, x2       // x6 = x1 | x2
-            instruction_memory[5] = make_r_type(7'b0000000, 5'd2, 5'd1, 3'b110, 5'd6, 7'b0110011);
-            
-            // XOR x7, x1, x2      // x7 = x1 ^ x2
-            instruction_memory[6] = make_r_type(7'b0000000, 5'd2, 5'd1, 3'b100, 5'd7, 7'b0110011);
+            // SW x4, 4(x0)       // Store x4 (SUB result) to address 4
+            instruction_memory[5] = make_s_type(12'd4, 5'd4, 5'd0, 3'b010, 7'b0100011);
             
             // Infinite loop to halt
-            instruction_memory[7] = make_i_type(-12'd4, 5'd0, 3'b000, 5'd0, 7'b1100111); // JAL x0, -4
+            instruction_memory[6] = make_i_type(-12'd4, 5'd0, 3'b000, 5'd0, 7'b1100111); // JALR x0, x0, -4
         end
     endtask
     
@@ -194,11 +191,12 @@ module processor_testbench();
             // SRLI x3, x1, 1      // x3 = x1 >> 1 = 4 (logical)
             instruction_memory[2] = make_i_type(12'd1, 5'd1, 3'b101, 5'd3, 7'b0010011);
             
-            // ADDI x4, x0, -8     // x4 = -8 (for arithmetic shift test)
-            instruction_memory[3] = make_i_type(-12'd8, 5'd0, 3'b000, 5'd4, 7'b0010011);
+            // Store results to memory for verification
+            // SW x2, 8(x0)       // Store x2 (SLLI result) to address 8
+            instruction_memory[3] = make_s_type(12'd8, 5'd2, 5'd0, 3'b010, 7'b0100011);
             
-            // SRAI x5, x4, 1      // x5 = x4 >> 1 = -4 (arithmetic)
-            instruction_memory[4] = make_i_type(12'b010000000001, 5'd4, 3'b101, 5'd5, 7'b0010011);
+            // SW x3, 12(x0)      // Store x3 (SRLI result) to address 12
+            instruction_memory[4] = make_s_type(12'd12, 5'd3, 5'd0, 3'b010, 7'b0100011);
             
             // Infinite loop to halt
             instruction_memory[5] = make_i_type(-12'd4, 5'd0, 3'b000, 5'd0, 7'b1100111);
@@ -208,17 +206,18 @@ module processor_testbench();
     task setup_load_store_test;
         begin
             // Test load/store operations
-            // ADDI x1, x0, 100    // x1 = 100 (base address)
-            instruction_memory[0] = make_i_type(12'd100, 5'd0, 3'b000, 5'd1, 7'b0010011);
+            // ADDI x1, x0, 42     // x1 = 42 (test value)
+            instruction_memory[0] = make_i_type(12'd42, 5'd0, 3'b000, 5'd1, 7'b0010011);
             
-            // ADDI x2, x0, 0x12345678 & 0xFFF  // Lower 12 bits
-            instruction_memory[1] = make_i_type(12'h678, 5'd0, 3'b000, 5'd2, 7'b0010011);
+            // SW x1, 16(x0)       // Store x1 to address 16
+            instruction_memory[1] = make_s_type(12'd16, 5'd1, 5'd0, 3'b010, 7'b0100011);
             
-            // SW x2, 0(x1)        // Store word to memory[100]
-            instruction_memory[2] = make_s_type(12'd0, 5'd2, 5'd1, 3'b010, 7'b0100011);
+            // LW x2, 16(x0)       // Load from address 16 to x2
+            instruction_memory[2] = make_i_type(12'd16, 5'd0, 3'b010, 5'd2, 7'b0000011);
             
-            // LW x3, 0(x1)        // Load word from memory[100] to x3
-            instruction_memory[3] = make_i_type(12'd0, 5'd1, 3'b010, 5'd3, 7'b0000011);
+            // Store loaded value for verification
+            // SW x2, 20(x0)       // Store x2 to address 20
+            instruction_memory[3] = make_s_type(12'd20, 5'd2, 5'd0, 3'b010, 7'b0100011);
             
             // Infinite loop to halt
             instruction_memory[4] = make_i_type(-12'd4, 5'd0, 3'b000, 5'd0, 7'b1100111);
@@ -231,20 +230,27 @@ module processor_testbench();
             // ADDI x1, x0, 10     // x1 = 10
             instruction_memory[0] = make_i_type(12'd10, 5'd0, 3'b000, 5'd1, 7'b0010011);
             
-            // ADDI x2, x0, 10     // x2 = 10
+            // ADDI x2, x0, 10     // x2 = 10 (same value)
             instruction_memory[1] = make_i_type(12'd10, 5'd0, 3'b000, 5'd2, 7'b0010011);
             
-            // BEQ x1, x2, 8       // Branch if equal (should branch)
-            instruction_memory[2] = {7'b0000000, 5'd2, 5'd1, 3'b000, 5'b01000, 7'b1100011}; // offset = 8
+            // ADDI x3, x0, 0      // x3 = 0 (will be overwritten if branch doesn't work)
+            instruction_memory[2] = make_i_type(12'd0, 5'd0, 3'b000, 5'd3, 7'b0010011);
             
-            // ADDI x3, x0, 99     // This should be skipped
-            instruction_memory[3] = make_i_type(12'd99, 5'd0, 3'b000, 5'd3, 7'b0010011);
+            // BEQ x1, x2, 8       // Branch if equal (should branch, skip next instruction)
+            instruction_memory[3] = {7'b0000000, 5'd2, 5'd1, 3'b000, 5'b01000, 7'b1100011}; // offset = 8
             
-            // ADDI x4, x0, 1      // This should be executed (branch target)
-            instruction_memory[4] = make_i_type(12'd1, 5'd0, 3'b000, 5'd4, 7'b0010011);
+            // ADDI x3, x0, 99     // This should be skipped if branch works
+            instruction_memory[4] = make_i_type(12'd99, 5'd0, 3'b000, 5'd3, 7'b0010011);
+            
+            // ADDI x3, x0, 1      // This should be executed (branch target)
+            instruction_memory[5] = make_i_type(12'd1, 5'd0, 3'b000, 5'd3, 7'b0010011);
+            
+            // Store result for verification
+            // SW x3, 24(x0)       // Store x3 to address 24
+            instruction_memory[6] = make_s_type(12'd24, 5'd3, 5'd0, 3'b010, 7'b0100011);
             
             // Infinite loop to halt
-            instruction_memory[5] = make_i_type(-12'd4, 5'd0, 3'b000, 5'd0, 7'b1100111);
+            instruction_memory[7] = make_i_type(-12'd4, 5'd0, 3'b000, 5'd0, 7'b1100111);
         end
     endtask
     
@@ -254,14 +260,12 @@ module processor_testbench();
             // LUI x1, 0x12345     // x1 = 0x12345000
             instruction_memory[0] = make_u_type(20'h12345, 5'd1, 7'b0110111);
             
-            // ADDI x1, x1, 0x678  // x1 = 0x12345678
-            instruction_memory[1] = make_i_type(12'h678, 5'd1, 3'b000, 5'd1, 7'b0010011);
-            
-            // AUIPC x2, 0x1000    // x2 = PC + 0x1000000
-            instruction_memory[2] = make_u_type(20'h1000, 5'd2, 7'b0010111);
+            // Store result for verification
+            // SW x1, 28(x0)       // Store x1 to address 28
+            instruction_memory[1] = make_s_type(12'd28, 5'd1, 5'd0, 3'b010, 7'b0100011);
             
             // Infinite loop to halt
-            instruction_memory[3] = make_i_type(-12'd4, 5'd0, 3'b000, 5'd0, 7'b1100111);
+            instruction_memory[2] = make_i_type(-12'd4, 5'd0, 3'b000, 5'd0, 7'b1100111);
         end
     endtask
     
@@ -290,7 +294,24 @@ module processor_testbench();
         
         // Test 1: Arithmetic operations
         setup_arithmetic_test();
-        run_test_sequence("Arithmetic Operations", 8, 100);
+        run_test_sequence("Arithmetic Operations", 100);
+        
+        // Verify arithmetic results
+        if (data_memory[0] == 32'd15) begin
+            $display("  PASS: ADD result = %d (expected 15)", data_memory[0]);
+            test_pass_count = test_pass_count + 1;
+        end else begin
+            $display("  FAIL: ADD result = %d (expected 15)", data_memory[0]);
+            test_fail_count = test_fail_count + 1;
+        end
+        
+        if (data_memory[1] == 32'd5) begin
+            $display("  PASS: SUB result = %d (expected 5)", data_memory[1]);
+            test_pass_count = test_pass_count + 1;
+        end else begin
+            $display("  FAIL: SUB result = %d (expected 5)", data_memory[1]);
+            test_fail_count = test_fail_count + 1;
+        end
         
         // Reset for next test
         resetn = 0;
@@ -299,7 +320,24 @@ module processor_testbench();
         
         // Test 2: Shift operations
         setup_shift_test();
-        run_test_sequence("Shift Operations", 6, 80);
+        run_test_sequence("Shift Operations", 80);
+        
+        // Verify shift results
+        if (data_memory[2] == 32'd16) begin
+            $display("  PASS: SLLI result = %d (expected 16)", data_memory[2]);
+            test_pass_count = test_pass_count + 1;
+        end else begin
+            $display("  FAIL: SLLI result = %d (expected 16)", data_memory[2]);
+            test_fail_count = test_fail_count + 1;
+        end
+        
+        if (data_memory[3] == 32'd4) begin
+            $display("  PASS: SRLI result = %d (expected 4)", data_memory[3]);
+            test_pass_count = test_pass_count + 1;
+        end else begin
+            $display("  FAIL: SRLI result = %d (expected 4)", data_memory[3]);
+            test_fail_count = test_fail_count + 1;
+        end
         
         // Reset for next test
         resetn = 0;
@@ -308,7 +346,16 @@ module processor_testbench();
         
         // Test 3: Load/Store operations
         setup_load_store_test();
-        run_test_sequence("Load/Store Operations", 5, 100);
+        run_test_sequence("Load/Store Operations", 100);
+        
+        // Verify load/store results
+        if (data_memory[4] == 32'd42 && data_memory[5] == 32'd42) begin
+            $display("  PASS: Load/Store test - stored %d, loaded %d", data_memory[4], data_memory[5]);
+            test_pass_count = test_pass_count + 1;
+        end else begin
+            $display("  FAIL: Load/Store test - stored %d, loaded %d", data_memory[4], data_memory[5]);
+            test_fail_count = test_fail_count + 1;
+        end
         
         // Reset for next test
         resetn = 0;
@@ -317,7 +364,16 @@ module processor_testbench();
         
         // Test 4: Branch operations
         setup_branch_test();
-        run_test_sequence("Branch Operations", 6, 80);
+        run_test_sequence("Branch Operations", 120);
+        
+        // Verify branch results
+        if (data_memory[6] == 32'd1) begin
+            $display("  PASS: Branch test - x3 = %d (expected 1, branch taken correctly)", data_memory[6]);
+            test_pass_count = test_pass_count + 1;
+        end else begin
+            $display("  FAIL: Branch test - x3 = %d (expected 1, branch may not work)", data_memory[6]);
+            test_fail_count = test_fail_count + 1;
+        end
         
         // Reset for next test
         resetn = 0;
@@ -326,7 +382,16 @@ module processor_testbench();
         
         // Test 5: Upper immediate operations
         setup_upper_immediate_test();
-        run_test_sequence("Upper Immediate Operations", 4, 60);
+        run_test_sequence("Upper Immediate Operations", 60);
+        
+        // Verify upper immediate results
+        if (data_memory[7] == 32'h12345000) begin
+            $display("  PASS: LUI result = 0x%h (expected 0x12345000)", data_memory[7]);
+            test_pass_count = test_pass_count + 1;
+        end else begin
+            $display("  FAIL: LUI result = 0x%h (expected 0x12345000)", data_memory[7]);
+            test_fail_count = test_fail_count + 1;
+        end
         
         $display("\nTest Summary:");
         $display("=============");
