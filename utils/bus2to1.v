@@ -101,14 +101,14 @@ always @(posedge clk) begin
         end
         
         // Buffer read data to break combinational loops
-        if (grant_m1 && s_ready && !m1_wstrb) begin
+        if (grant_m1 && s_ready && m1_valid && (m1_wstrb == 4'h0)) begin
             m1_rdata_reg <= s_rdata;
             m1_rdata_valid <= 1'b1;
         end else if (!m1_valid) begin
             m1_rdata_valid <= 1'b0;
         end
         
-        if (grant_m2 && s_ready && !m2_wstrb) begin
+        if (grant_m2 && s_ready && m2_valid && (m2_wstrb == 4'h0)) begin
             m2_rdata_reg <= s_rdata;
             m2_rdata_valid <= 1'b1;
         end else if (!m2_valid) begin
