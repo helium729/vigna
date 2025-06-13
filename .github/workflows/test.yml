@@ -1,0 +1,42 @@
+name: Vigna Processor Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Icarus Verilog
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y iverilog
+    
+    - name: Verify tools installation
+      run: |
+        iverilog -V
+        vvp -V
+    
+    - name: Run syntax checks
+      run: |
+        make syntax
+        make enhanced_syntax
+        make comprehensive_syntax
+    
+    - name: Run basic tests
+      run: make quick_test
+    
+    - name: Run enhanced tests
+      run: make enhanced_quick_test
+    
+    - name: Run comprehensive tests
+      run: make comprehensive_quick_test
+    
+    - name: Test results summary
+      run: echo "All test suites completed successfully!"
