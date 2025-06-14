@@ -66,6 +66,11 @@
 
 `define VIGNA_CORE_ZICSR_EXTENSION
 
+/* F extension support
+ * uncomment this line to enable RISC-V single-precision floating point extension
+ * this adds 32-bit IEEE 754 floating point support with 32 FP registers */
+
+`define VIGNA_CORE_F_EXTENSION
 
 /* C extension support
  * uncomment this line to enable RISC-V Compact instruction extension
