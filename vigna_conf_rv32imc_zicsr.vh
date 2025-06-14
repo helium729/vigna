@@ -1,6 +1,7 @@
 `ifndef VIGNA_CONF_VH
 `define VIGNA_CONF_VH
 
+/* RV32IMC_ZICSR Configuration - Full featured with all extensions */
 
 /* ------------------------------------------------------------------------- */
 
@@ -36,8 +37,6 @@
 
 /* ------------------------------------------------------------------------- */
 
-/* ------------------------------------------------------------------------- */
-
 /* shift instruction options 
  * two-stage shift: make shifts in 4 bits then 1 bit
  * none: shift one bit per cycle
@@ -57,6 +56,7 @@
 
 /*--------------------------------------------------------------------------*/
 
+// M extension ENABLED - multiply/divide
 `define VIGNA_CORE_M_EXTENSION
 
 //ToDo
@@ -65,12 +65,11 @@
 //ToDo
 //`define VIGNA_CORE_INTERRUPT
 
+// ZICSR extension ENABLED - Control and Status Registers
 `define VIGNA_CORE_ZICSR_EXTENSION
 
 /* C extension support
- * uncomment this line to enable RISC-V Compact instruction extension
- * this allows 16-bit compressed instructions to be used alongside 32-bit instructions */
- 
+ * ENABLED - allows 16-bit compressed instructions */
 `define VIGNA_CORE_C_EXTENSION
 
 `define VIGNA_CORE_ALIGNMENT
@@ -79,7 +78,9 @@
 
 /* AXI-Lite bus interface option
  * uncomment this line to enable AXI4-Lite interface instead of simple interface
- * when enabled, use vigna_axi module instead of vigna module */
+ * when enabled, use vigna_axi module instead of vigna module 
+ * This does not have effect actually, so do it at your will.
+ */
 
 //`define VIGNA_AXI_LITE_INTERFACE
 
