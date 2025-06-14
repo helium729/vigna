@@ -276,17 +276,17 @@ wire [31:0] op1, op2;
 `ifdef VIGNA_CORE_ZICSR_EXTENSION
 assign op1 = is_jal || u_type   ? imm : 
              is_csr_op          ? csr_rval : rs1_val;
-assign op2 = r_type || b_type   ? rs2_val :
-             is_auipc || j_type ? inst_addr :
-             is_slli || is_srli ? {27'b0, shamt} :
-             is_lui             ? 32'd0 :
-             (is_csrrwi || is_csrrsi || is_csrrci) ? {27'b0, rs1} : imm;
+assign op2 = (r_type || b_type)   ? rs2_val :
+             (is_auipc || j_type) ? inst_addr :
+             (is_slli || is_srli) ? {27'b0, shamt} :
+             is_lui               ? 32'd0 :
+             ((is_csrrwi || is_csrrsi || is_csrrci) ? {27'b0, rs1} : imm);
 `else
 assign op1 = is_jal || u_type   ? imm : rs1_val;
-assign op2 = r_type || b_type   ? rs2_val :
-             is_auipc || j_type ? inst_addr :
-             is_slli || is_srli ? {27'b0, shamt} :
-             is_lui             ? 32'd0 : imm; 
+assign op2 = (r_type || b_type)   ? rs2_val :
+             (is_auipc || j_type) ? inst_addr :
+             (is_slli || is_srli) ? {27'b0, shamt} :
+             is_lui               ? 32'd0 : imm; 
 `endif 
 
 //backend state
