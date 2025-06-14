@@ -1,6 +1,6 @@
 # VIGNA
 
-Vigna is a CPU core that implements [RISC-V Instruction Set](http://riscv.org). Current supported architecture is RV32I/E[M]
+Vigna is a CPU core that implements [RISC-V Instruction Set](http://riscv.org). Current supported architecture is RV32I/E[M][C]
 
 Tools (gcc, binutils, etc..) can be obtained via the [RISC-V Website](https://riscv.org/software-status/)
 
@@ -46,6 +46,9 @@ This Verilog header file defines the configurations of core vigna, including ext
 
 #### TESTS.md
 Documentation explaining the comprehensive test programs created for the Vigna processor, including detailed coverage of RISC-V instruction testing.
+
+#### C_EXTENSION.md
+Documentation for the optional RISC-V Compact (C) instruction extension support, including implementation details, configuration, and supported instructions.
 
 #### Makefile
 Build system that provides targets for compiling, running tests, syntax checking, and waveform generation for the processor testbenches.

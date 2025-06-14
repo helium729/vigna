@@ -65,6 +65,12 @@
 //ToDo
 //`define VIGNA_CORE_INTERRUPT
 
+/* C extension support
+ * uncomment this line to enable RISC-V Compact instruction extension
+ * this allows 16-bit compressed instructions to be used alongside 32-bit instructions */
+ 
+////`define VIGNA_CORE_C_EXTENSION
+
 `define VIGNA_CORE_ALIGNMENT
 
 /*--------------------------------------------------------------------------*/

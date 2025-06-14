@@ -54,6 +54,12 @@ wire [31:0] inst_addr;
 reg  [ 1:0] fetch_state;
 reg  internal_valid;
 
+`ifdef VIGNA_CORE_C_EXTENSION
+reg  [15:0] pending_inst; // Store upper 16 bits when fetching compressed instruction
+reg  inst_is_16bit;       // Flag indicating current instruction is 16-bit
+reg  have_pending;        // Flag indicating we have a pending upper 16 bits  
+`endif
+
 wire fetched, fetch_received;
 assign fetched = fetch_state == 3;
 
@@ -71,6 +77,11 @@ always @ (posedge clk) begin
         pc              <= `VIGNA_CORE_RESET_ADDR;
         fetch_state     <= 0;
         internal_valid  <= 0;
+        `ifdef VIGNA_CORE_C_EXTENSION
+        pending_inst    <= 16'h0;
+        inst_is_16bit   <= 0;
+        have_pending    <= 0;
+        `endif
     end else begin
         //fetch logic
         case (fetch_state)
@@ -80,7 +91,21 @@ always @ (posedge clk) begin
             end
             1: begin
                 if (i_ready) begin
+                    `ifdef VIGNA_CORE_C_EXTENSION
+                    // Simple approach: check if lower 16 bits are compressed
+                    if (i_rdata[1:0] != 2'b11) begin
+                        // 16-bit compressed instruction
+                        inst[31:16]   <= 16'h0;
+                        inst[15:0]    <= i_rdata[15:0];
+                        inst_is_16bit <= 1;
+                    end else begin
+                        // 32-bit instruction
+                        inst          <= i_rdata;
+                        inst_is_16bit <= 0;
+                    end
+                    `else
                     inst            <= i_rdata;
+                    `endif
                     internal_valid  <= 0;
                     fetch_state     <= 3;
                 end
@@ -108,12 +133,12 @@ wire [4:0] rd;
 wire [4:0] rs1;
 wire [4:0] rs2;
 
-assign opcode = inst[6:0];
-assign funct3 = inst[14:12];
-assign funct7 = inst[31:25];
-assign rd     = inst[11:7];
-assign rs1    = inst[19:15];
-assign rs2    = inst[24:20];
+assign opcode = effective_inst[6:0];
+assign funct3 = effective_inst[14:12];
+assign funct7 = effective_inst[31:25];
+assign rd     = effective_inst[11:7];
+assign rs1    = effective_inst[19:15];
+assign rs2    = effective_inst[24:20];
 
 //r
 wire is_add, is_sub, is_sll, is_slt, is_sltu, is_xor, is_srl, is_sra, is_or, is_and;
@@ -147,22 +172,22 @@ assign b_type = opcode == 7'b1100011;
 assign j_type = opcode == 7'b1101111;
 
 wire [31:0] imm;
-assign imm[31]    = inst[31];
-assign imm[30:20] = u_type           ? inst[30:20] : {11{inst[31]}};
-assign imm[19:12] = u_type || j_type ? inst[19:12] : {8{inst[31]}};
+assign imm[31]    = effective_inst[31];
+assign imm[30:20] = u_type           ? effective_inst[30:20] : {11{effective_inst[31]}};
+assign imm[19:12] = u_type || j_type ? effective_inst[19:12] : {8{effective_inst[31]}};
 assign imm[11]    = u_type           ? 1'b0 :
-                    j_type           ? inst[20] :
-                    b_type           ? inst[7] : inst[31];
-assign imm[10:5]  = u_type           ? 6'b000000 : inst[30:25];
+                    j_type           ? effective_inst[20] :
+                    b_type           ? effective_inst[7] : effective_inst[31];
+assign imm[10:5]  = u_type           ? 6'b000000 : effective_inst[30:25];
 assign imm[4:1]   = u_type           ? 5'b00000 :
                     u_type           ? 4'b0000 :
-                    i_type || j_type ? inst[24:21] : inst[11:8];
-assign imm[0]     = i_type           ? inst[20] :
-                    s_type           ? inst[7] : 1'b0;
+                    i_type || j_type ? effective_inst[24:21] : effective_inst[11:8];
+assign imm[0]     = i_type           ? effective_inst[20] :
+                    s_type           ? effective_inst[7] : 1'b0;
 
 
 wire [4:0] shamt;
-assign shamt = inst[24:20];
+assign shamt = effective_inst[24:20];
 
 //r type
 assign is_add  = funct3 == 3'b000 && funct7_zero    && r_type;
@@ -215,6 +240,120 @@ assign is_auipc = opcode == 7'b0010111;
 
 //j type
 assign is_jal = j_type;
+
+`ifdef VIGNA_CORE_C_EXTENSION
+// C extension instruction decoding
+wire [1:0] c_op;
+wire [2:0] c_funct3;
+wire [4:0] c_rs1, c_rs2, c_rd;
+wire [4:0] c_rs1_compressed, c_rs2_compressed; // 3-bit compressed register indices
+wire [31:0] c_imm;
+wire [31:0] expanded_inst; // Expanded 32-bit instruction from 16-bit C instruction
+
+// Extract C instruction fields
+assign c_op = inst[1:0];
+assign c_funct3 = inst[15:13];
+assign c_rs1 = inst[11:7];
+assign c_rs2 = inst[6:2];
+assign c_rd = inst[11:7];
+assign c_rs1_compressed = {2'b01, inst[9:7]}; // x8-x15 mapping
+assign c_rs2_compressed = {2'b01, inst[4:2]}; // x8-x15 mapping
+
+// C instruction type detection
+wire c_addi4spn, c_lw, c_sw, c_addi, c_jal, c_li, c_lui, c_srli, c_srai, c_andi, c_sub, c_xor, c_or, c_and;
+wire c_j, c_beqz, c_bnez, c_slli, c_lwsp, c_jr, c_mv, c_ebreak, c_jalr, c_add, c_swsp;
+
+// CR format (Compressed Register)
+assign c_jr   = (c_op == 2'b10) && (c_funct3 == 3'b100) && (inst[12] == 1'b0) && (inst[6:2] == 5'b00000);
+assign c_mv   = (c_op == 2'b10) && (c_funct3 == 3'b100) && (inst[12] == 1'b0) && (inst[6:2] != 5'b00000);
+assign c_jalr = (c_op == 2'b10) && (c_funct3 == 3'b100) && (inst[12] == 1'b1) && (inst[6:2] == 5'b00000);
+assign c_add  = (c_op == 2'b10) && (c_funct3 == 3'b100) && (inst[12] == 1'b1) && (inst[6:2] != 5'b00000);
+
+// CI format (Compressed Immediate)
+assign c_addi = (c_op == 2'b01) && (c_funct3 == 3'b000);
+assign c_jal  = (c_op == 2'b01) && (c_funct3 == 3'b001);
+assign c_li   = (c_op == 2'b01) && (c_funct3 == 3'b010);
+assign c_lui  = (c_op == 2'b01) && (c_funct3 == 3'b011);
+assign c_slli = (c_op == 2'b10) && (c_funct3 == 3'b000);
+assign c_lwsp = (c_op == 2'b10) && (c_funct3 == 3'b010);
+
+// CSS format (Compressed Stack-relative Store)
+assign c_swsp = (c_op == 2'b10) && (c_funct3 == 3'b110);
+
+// CIW format (Compressed Immediate Wide)
+assign c_addi4spn = (c_op == 2'b00) && (c_funct3 == 3'b000);
+
+// CL format (Compressed Load)
+assign c_lw = (c_op == 2'b00) && (c_funct3 == 3'b010);
+
+// CS format (Compressed Store)
+assign c_sw = (c_op == 2'b00) && (c_funct3 == 3'b110);
+
+// CB format (Compressed Branch)
+assign c_srli = (c_op == 2'b01) && (c_funct3 == 3'b100) && (inst[11:10] == 2'b00);
+assign c_srai = (c_op == 2'b01) && (c_funct3 == 3'b100) && (inst[11:10] == 2'b01);
+assign c_andi = (c_op == 2'b01) && (c_funct3 == 3'b100) && (inst[11:10] == 2'b10);
+assign c_sub  = (c_op == 2'b01) && (c_funct3 == 3'b100) && (inst[11:10] == 2'b11) && (inst[6:5] == 2'b00);
+assign c_xor  = (c_op == 2'b01) && (c_funct3 == 3'b100) && (inst[11:10] == 2'b11) && (inst[6:5] == 2'b01);
+assign c_or   = (c_op == 2'b01) && (c_funct3 == 3'b100) && (inst[11:10] == 2'b11) && (inst[6:5] == 2'b10);
+assign c_and  = (c_op == 2'b01) && (c_funct3 == 3'b100) && (inst[11:10] == 2'b11) && (inst[6:5] == 2'b11);
+assign c_beqz = (c_op == 2'b01) && (c_funct3 == 3'b110);
+assign c_bnez = (c_op == 2'b01) && (c_funct3 == 3'b111);
+
+// CJ format (Compressed Jump)
+assign c_j = (c_op == 2'b01) && (c_funct3 == 3'b101);
+
+// C instruction immediate generation
+wire [31:0] c_imm_addi4spn, c_imm_lw_sw, c_imm_addi, c_imm_jal, c_imm_li, c_imm_lui;
+wire [31:0] c_imm_slli, c_imm_lwsp, c_imm_swsp, c_imm_beqz_bnez, c_imm_j;
+
+assign c_imm_addi4spn = {22'b0, inst[10:7], inst[12:11], inst[5], inst[6], 2'b00}; // CIW
+assign c_imm_lw_sw = {25'b0, inst[5], inst[12:10], inst[6], 2'b00}; // CL/CS
+assign c_imm_addi = {{26{inst[12]}}, inst[12], inst[6:2]}; // CI
+assign c_imm_jal = {{20{inst[12]}}, inst[12], inst[8], inst[10:9], inst[6], inst[7], inst[2], inst[11], inst[5:3], 1'b0}; // CJ
+assign c_imm_li = {{26{inst[12]}}, inst[12], inst[6:2]}; // CI
+assign c_imm_lui = {{14{inst[12]}}, inst[12], inst[6:2], 12'b0}; // CI
+assign c_imm_slli = {26'b0, inst[12], inst[6:2]}; // CI
+assign c_imm_lwsp = {24'b0, inst[3:2], inst[12], inst[6:4], 2'b00}; // CI
+assign c_imm_swsp = {24'b0, inst[8:7], inst[12:9], 2'b00}; // CSS
+assign c_imm_beqz_bnez = {{23{inst[12]}}, inst[12], inst[6:5], inst[2], inst[11:10], inst[4:3], 1'b0}; // CB
+assign c_imm_j = {{20{inst[12]}}, inst[12], inst[8], inst[10:9], inst[6], inst[7], inst[2], inst[11], inst[5:3], 1'b0}; // CJ
+
+// Expand compressed instructions to 32-bit equivalents
+assign expanded_inst = 
+    c_addi4spn ? {c_imm_addi4spn[11:0], 5'd2, 3'b000, c_rs2_compressed, 7'b0010011} : // ADDI rd', x2, nzuimm
+    c_lw       ? {c_imm_lw_sw[11:0], c_rs1_compressed, 3'b010, c_rs2_compressed, 7'b0000011} : // LW rd', offset(rs1')
+    c_sw       ? {c_imm_lw_sw[11:5], c_rs2_compressed, c_rs1_compressed, 3'b010, c_imm_lw_sw[4:0], 7'b0100011} : // SW rs2', offset(rs1')
+    c_addi     ? {c_imm_addi[11:0], c_rs1, 3'b000, c_rd, 7'b0010011} : // ADDI rd, rs1, imm
+    c_jal      ? {c_imm_jal[20], c_imm_jal[10:1], c_imm_jal[11], c_imm_jal[19:12], 5'd1, 7'b1101111} : // JAL x1, offset
+    c_li       ? {c_imm_li[11:0], 5'd0, 3'b000, c_rd, 7'b0010011} : // ADDI rd, x0, imm
+    c_lui      ? {c_imm_lui[31:12], c_rd, 7'b0110111} : // LUI rd, imm
+    c_srli     ? {7'b0000000, inst[6:2], c_rs1_compressed, 3'b101, c_rs1_compressed, 7'b0010011} : // SRLI rs1', shamt
+    c_srai     ? {7'b0100000, inst[6:2], c_rs1_compressed, 3'b101, c_rs1_compressed, 7'b0010011} : // SRAI rs1', shamt
+    c_andi     ? {c_imm_addi[11:0], c_rs1_compressed, 3'b111, c_rs1_compressed, 7'b0010011} : // ANDI rs1', imm
+    c_sub      ? {7'b0100000, c_rs2_compressed, c_rs1_compressed, 3'b000, c_rs1_compressed, 7'b0110011} : // SUB rs1', rs2'
+    c_xor      ? {7'b0000000, c_rs2_compressed, c_rs1_compressed, 3'b100, c_rs1_compressed, 7'b0110011} : // XOR rs1', rs2'
+    c_or       ? {7'b0000000, c_rs2_compressed, c_rs1_compressed, 3'b110, c_rs1_compressed, 7'b0110011} : // OR rs1', rs2'
+    c_and      ? {7'b0000000, c_rs2_compressed, c_rs1_compressed, 3'b111, c_rs1_compressed, 7'b0110011} : // AND rs1', rs2'
+    c_j        ? {c_imm_j[20], c_imm_j[10:1], c_imm_j[11], c_imm_j[19:12], 5'd0, 7'b1101111} : // JAL x0, offset
+    c_beqz     ? {c_imm_beqz_bnez[12], c_imm_beqz_bnez[10:5], 5'd0, c_rs1_compressed, 3'b000, c_imm_beqz_bnez[4:1], c_imm_beqz_bnez[11], 7'b1100011} : // BEQ rs1', x0, offset
+    c_bnez     ? {c_imm_beqz_bnez[12], c_imm_beqz_bnez[10:5], 5'd0, c_rs1_compressed, 3'b001, c_imm_beqz_bnez[4:1], c_imm_beqz_bnez[11], 7'b1100011} : // BNE rs1', x0, offset
+    c_slli     ? {7'b0000000, inst[6:2], c_rs1, 3'b001, c_rd, 7'b0010011} : // SLLI rd, rs1, shamt
+    c_lwsp     ? {c_imm_lwsp[11:0], 5'd2, 3'b010, c_rd, 7'b0000011} : // LW rd, offset(x2)
+    c_jr       ? {12'b0, c_rs1, 3'b000, 5'd0, 7'b1100111} : // JALR x0, 0(rs1)
+    c_mv       ? {7'b0000000, c_rs2, 5'd0, 3'b000, c_rd, 7'b0110011} : // ADD rd, x0, rs2
+    c_jalr     ? {12'b0, c_rs1, 3'b000, 5'd1, 7'b1100111} : // JALR x1, 0(rs1)
+    c_add      ? {7'b0000000, c_rs2, c_rs1, 3'b000, c_rd, 7'b0110011} : // ADD rd, rs1, rs2
+    c_swsp     ? {c_imm_swsp[11:5], c_rs2, 5'd2, 3'b010, c_imm_swsp[4:0], 7'b0100011} : // SW rs2, offset(x2)
+    32'h00000013; // Default to NOP (ADDI x0, x0, 0)
+
+// Select between original 32-bit instruction and expanded C instruction
+wire [31:0] effective_inst;
+assign effective_inst = (inst_is_16bit) ? expanded_inst : inst;
+`else
+wire [31:0] effective_inst;
+assign effective_inst = inst;
+`endif
 
 `ifdef VIGNA_CORE_M_EXTENSION
 //m type
@@ -314,7 +453,13 @@ assign shift_val =
 `endif
 
 wire [31:0] inst_add_result;
-assign inst_add_result = inst_addr + (b_type ? imm: 32'd4);
+`ifdef VIGNA_CORE_C_EXTENSION
+wire [31:0] pc_increment;
+assign pc_increment = inst_is_16bit ? 32'd2 : 32'd4;
+assign inst_add_result = inst_addr + (b_type ? imm : pc_increment);
+`else
+assign inst_add_result = inst_addr + (b_type ? imm : 32'd4);
+`endif
 
 reg ex_branch;
 reg ex_jump;
@@ -323,7 +468,12 @@ reg [3:0] ls_strb;
 reg ls_sign_extend;
 
 assign pc_next =  ex_jump           ? dr :
-                  ex_branch & dr[0] ? d3 : pc + 32'd4;
+                  ex_branch & dr[0] ? d3 : 
+                  `ifdef VIGNA_CORE_C_EXTENSION
+                  pc + pc_increment;
+                  `else
+                  pc + 32'd4;
+                  `endif
 
 reg write_mem;
 
