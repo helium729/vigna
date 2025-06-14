@@ -103,10 +103,36 @@ make comprehensive_quick_test
 make enhanced_test
 make comprehensive_test
 
+# Test all RISC-V configurations
+make test_all_configs
+
+# Test specific configurations
+make test_rv32i           # Base RV32I only
+make test_rv32im          # With multiply/divide
+make test_rv32ic          # With compressed instructions
+make test_rv32imc_zicsr   # Full featured
+
 # Syntax checking
 make enhanced_syntax
 make comprehensive_syntax
+make syntax_all_configs   # All configurations
+
+# Complete C program tests
+make program_quick_test
+make program_test_rv32im_zicsr
 ```
+
+### Configuration Testing
+The processor supports multiple RISC-V configurations:
+- **RV32I**: Base integer instruction set
+- **RV32IM**: Base + multiply/divide extension
+- **RV32IC**: Base + compressed instructions
+- **RV32IMC**: Base + multiply + compressed
+- **RV32E**: Embedded (16 registers)
+- **RV32IM+Zicsr**: Base + multiply + CSR support
+- **RV32IMC+Zicsr**: Full featured configuration
+
+See [CONFIGURATION_TESTING.md](CONFIGURATION_TESTING.md) for detailed information.
 
 ### Test Coverage
 The test suite covers:

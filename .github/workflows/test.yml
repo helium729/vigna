@@ -28,6 +28,11 @@ jobs:
         make syntax
         make enhanced_syntax
         make comprehensive_syntax
+        make program_syntax
+        make axi_syntax
+    
+    - name: Run configuration-specific syntax checks
+      run: make syntax_all_configs
     
     - name: Run basic tests
       run: make quick_test
@@ -38,5 +43,37 @@ jobs:
     - name: Run comprehensive tests
       run: make comprehensive_quick_test
     
+    - name: Run all configuration tests
+      run: make test_all_configs
+    
+    - name: Build C programs (if cross-compiler available)
+      run: |
+        if command -v riscv64-linux-gnu-gcc &> /dev/null; then
+          cd programs && make all
+        else
+          echo "RISC-V cross-compiler not available, skipping C program tests"
+        fi
+      continue-on-error: true
+    
+    - name: Run program tests (if C programs built)
+      run: |
+        if [ -d "programs/build" ] && [ "$(ls -A programs/build)" ]; then
+          make program_quick_test
+          make program_test_rv32im_zicsr
+          make program_test_rv32imc_zicsr
+        else
+          echo "C programs not built, skipping program tests"
+        fi
+      continue-on-error: true
+    
     - name: Test results summary
-      run: echo "All test suites completed successfully!"
+      run: |
+        echo "✅ All configuration tests completed successfully!"
+        echo "✅ Tested configurations:"
+        echo "  - RV32I (Base only)"
+        echo "  - RV32IM (Base + Multiply/Divide)"
+        echo "  - RV32IC (Base + Compressed)"
+        echo "  - RV32IMC (Base + Multiply + Compressed)" 
+        echo "  - RV32E (Embedded)"
+        echo "  - RV32IM+Zicsr (Base + Multiply + CSR)"
+        echo "  - RV32IMC+Zicsr (Full featured)"
