@@ -78,6 +78,7 @@
 /* AXI-Lite bus interface option
  * uncomment this line to enable AXI4-Lite interface instead of simple interface
  * when enabled, use vigna_axi module instead of vigna module */
+ * This does not have effect actually, so do it at your will.
 
 //`define VIGNA_AXI_LITE_INTERFACE
 
