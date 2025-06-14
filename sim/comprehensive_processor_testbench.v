@@ -367,7 +367,8 @@ module comprehensive_processor_testbench();
         resetn = 1;
         test_branch_operations();
         
-        // Test 4: C extension operations
+        // Test 4: C extension operations (only if enabled)
+        `ifdef VIGNA_CORE_C_EXTENSION
         resetn = 0;
         for (integer i = 0; i < 1024; i = i + 1) begin
             instruction_memory[i] = 32'h00000013;
@@ -376,6 +377,7 @@ module comprehensive_processor_testbench();
         repeat(5) @(posedge clk);
         resetn = 1;
         test_c_extension_operations();
+        `endif
         
         $display("\nComprehensive Test Summary:");
         $display("===========================");
