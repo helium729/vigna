@@ -62,8 +62,7 @@
 //ToDo
 //`define VIGNA_CORE_M_FPGA_FAST
 
-//ToDo
-//`define VIGNA_CORE_INTERRUPT
+`define VIGNA_CORE_INTERRUPT
 
 /* C extension support
  * uncomment this line to enable RISC-V Compact instruction extension

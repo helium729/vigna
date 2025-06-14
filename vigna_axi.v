@@ -29,6 +29,13 @@ module vigna_axi(
     input clk,
     input resetn,
 
+`ifdef VIGNA_CORE_INTERRUPT
+    // Interrupt inputs
+    input             ext_irq,      // External interrupt
+    input             timer_irq,    // Timer interrupt
+    input             soft_irq,     // Software interrupt
+`endif
+
     // AXI4-Lite Instruction Read Interface
     output reg        i_arvalid,
     input             i_arready,
@@ -84,6 +91,12 @@ wire [3:0]  core_d_wstrb;
 vigna vigna_core_inst(
     .clk(clk),
     .resetn(resetn),
+    
+`ifdef VIGNA_CORE_INTERRUPT
+    .ext_irq(ext_irq),
+    .timer_irq(timer_irq),
+    .soft_irq(soft_irq),
+`endif
     
     .i_valid(core_i_valid),
     .i_ready(core_i_ready),
