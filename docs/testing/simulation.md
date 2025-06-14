@@ -117,7 +117,7 @@ sudo apt install iverilog gtkwave make
 
 ## Running the Tests
 
-1. Navigate to the vigna directory
+1. Navigate to the project root directory
 2. Run the desired test:
    ```bash
    make comprehensive_quick_test
