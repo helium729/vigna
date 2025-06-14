@@ -22,6 +22,8 @@ CONF_RV32E = vigna_conf_rv32e.vh
 CONF_RV32IM_ZICSR = vigna_conf_rv32im_zicsr.vh
 CONF_RV32IMC_ZICSR = vigna_conf_rv32imc_zicsr.vh
 CONF_C_TEST = vigna_conf_c_test.vh
+CONF_RV32IF = vigna_conf_rv32if.vh
+CONF_RV32IMF = vigna_conf_rv32imf.vh
 
 # Test targets
 TESTBENCH = processor_testbench
@@ -47,7 +49,7 @@ AXI_VCD_FILE = $(SIM_DIR)/vigna_axi_test.vcd
 all: comprehensive_test interrupt_test
 
 # Test all configurations
-test_all_configs: test_rv32i test_rv32im test_rv32ic test_rv32imc test_rv32e test_rv32im_zicsr test_rv32imc_zicsr
+test_all_configs: test_rv32i test_rv32im test_rv32ic test_rv32imc test_rv32e test_rv32im_zicsr test_rv32imc_zicsr test_rv32if test_rv32imf
 
 # Test all interfaces
 test_all: comprehensive_test program_test axi_test interrupt_test
@@ -143,6 +145,18 @@ test_rv32imc_zicsr:
 	$(IVERILOG) -o /tmp/rv32imc_zicsr_test.vvp -I. -D VIGNA_CORE_RESET_ADDR=32\'h0000_0000 -D VIGNA_CORE_TWO_STAGE_SHIFT -D VIGNA_CORE_PRELOAD_NEGATIVE -D VIGNA_TOP_BUS_BINDING -D VIGNA_CORE_ALIGNMENT -D VIGNA_CORE_M_EXTENSION -D VIGNA_CORE_C_EXTENSION -D VIGNA_CORE_ZICSR_EXTENSION $(CORE_SOURCES) $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).v
 	$(VVP) /tmp/rv32imc_zicsr_test.vvp
 	rm -f /tmp/rv32imc_zicsr_test.vvp
+
+test_rv32if:
+	@echo "Testing RV32IF (Base + Float) configuration..."
+	$(IVERILOG) -o /tmp/rv32if_test.vvp -I. $(CORE_SOURCES) $(CONF_RV32IF) $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).v
+	$(VVP) /tmp/rv32if_test.vvp
+	rm -f /tmp/rv32if_test.vvp
+
+test_rv32imf:
+	@echo "Testing RV32IMF (Base + Multiply + Float) configuration..."
+	$(IVERILOG) -o /tmp/rv32imf_test.vvp -I. $(CORE_SOURCES) $(CONF_RV32IMF) $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).v
+	$(VVP) /tmp/rv32imf_test.vvp
+	rm -f /tmp/rv32imf_test.vvp
 
 # View waveforms (requires X11)
 wave: $(VCD_FILE)

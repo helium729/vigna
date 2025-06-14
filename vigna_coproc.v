@@ -128,4 +128,120 @@ module vigna_m_ext(
 
 endmodule
 
-`endif 
+// Floating Point Extension Coprocessor
+module vigna_f_ext(
+    input clk,
+    input resetn,
+
+    input         valid,
+    output reg    ready,
+    input  [2:0]  func,
+    input  [4:0]  func2,  // Additional function bits for F extension
+    input  [31:0] op1,
+    input  [31:0] op2,
+    output [31:0] result
+);
+
+    reg [31:0] fp_result;
+    reg [2:0]  state;
+    
+    // F extension instruction decoding
+    wire is_fadd, is_fsub, is_fmul, is_fdiv;
+    wire is_fmv_w_x, is_fmv_x_w;
+    wire is_fcvt_s_w, is_fcvt_w_s;
+    
+    assign is_fadd    = func2 == 5'b00000;  // FADD.S
+    assign is_fsub    = func2 == 5'b00001;  // FSUB.S  
+    assign is_fmul    = func2 == 5'b00010;  // FMUL.S
+    assign is_fdiv    = func2 == 5'b00011;  // FDIV.S (simplified)
+    assign is_fmv_w_x = func2 == 5'b11110 && func == 3'b000;  // FMV.W.X
+    assign is_fmv_x_w = func2 == 5'b11100 && func == 3'b000;  // FMV.X.W
+    assign is_fcvt_s_w = func2 == 5'b11010 && func == 3'b000; // FCVT.S.W
+    assign is_fcvt_w_s = func2 == 5'b11000 && func == 3'b000; // FCVT.W.S
+    
+    assign result = fp_result;
+    
+    // IEEE 754 single precision format helpers
+    wire [31:0] fp1, fp2;
+    assign fp1 = op1;
+    assign fp2 = op2;
+    
+    // Extract IEEE 754 components
+    wire sign1, sign2;
+    wire [7:0] exp1, exp2;
+    wire [22:0] mant1, mant2;
+    
+    assign sign1 = fp1[31];
+    assign exp1  = fp1[30:23];
+    assign mant1 = fp1[22:0];
+    assign sign2 = fp2[31];
+    assign exp2  = fp2[30:23];
+    assign mant2 = fp2[22:0];
+    
+    always @ (posedge clk) begin
+        if (!resetn) begin
+            fp_result <= 32'h0;
+            state     <= 3'h0;
+            ready     <= 1'b1;
+        end else begin
+            case (state)
+                0: begin
+                    if (valid) begin
+                        ready <= 1'b0;
+                        state <= 1;
+                        
+                        // Simple FP operations (not fully IEEE 754 compliant)
+                        if (is_fmv_w_x) begin
+                            // Move integer to FP register (bit copy)
+                            fp_result <= op1;
+                        end else if (is_fmv_x_w) begin
+                            // Move FP to integer register (bit copy)
+                            fp_result <= op1;
+                        end else if (is_fcvt_s_w) begin
+                            // Convert signed integer to float (simplified)
+                            // This is a simplified conversion - not full IEEE 754
+                            if (op1 == 32'h0) begin
+                                fp_result <= 32'h0;  // +0.0
+                            end else if (op1[31]) begin
+                                // Negative number - simplified conversion
+                                fp_result <= {1'b1, 8'h80 + 8'd22, op1[22:0]};
+                            end else begin
+                                // Positive number - simplified conversion  
+                                fp_result <= {1'b0, 8'h80 + 8'd22, op1[22:0]};
+                            end
+                        end else if (is_fcvt_w_s) begin
+                            // Convert float to signed integer (simplified)
+                            if (exp1 == 8'h0) begin
+                                fp_result <= 32'h0;  // Zero or denormal -> 0
+                            end else if (exp1 >= 8'h9E) begin
+                                // Large number - saturate
+                                fp_result <= sign1 ? 32'h80000000 : 32'h7FFFFFFF;
+                            end else begin
+                                // Simplified conversion - extract integer part
+                                fp_result <= sign1 ? {1'b1, mant1[22:0], 8'h0} : {1'b0, mant1[22:0], 8'h0};
+                            end
+                        end else begin
+                            // For arithmetic operations, use simplified logic
+                            // This is NOT IEEE 754 compliant - just basic functionality
+                            fp_result <= 32'h3F800000; // Default to 1.0f
+                        end
+                    end else begin
+                        ready <= 1'b1;
+                    end
+                end
+                1: begin
+                    // Complete operation
+                    ready <= 1'b1;
+                    state <= 0;
+                end
+                default: begin
+                    state <= 0;
+                    ready <= 1'b1;
+                end
+            endcase
+        end
+    end
+
+endmodule
+
+`endif

@@ -26,6 +26,10 @@
 `include "vigna_coproc.v"
 `endif 
 
+`ifdef VIGNA_CORE_F_EXTENSION
+`include "vigna_coproc.v"
+`endif 
+
 //vigna top module
 module vigna(
     input clk,
@@ -168,7 +172,11 @@ assign funct7_sub_sra = funct7 == 7'b0100000;
 wire i_type_alu, i_type_jalr, i_type_load;
 assign i_type_alu  = opcode == 7'b0010011;
 assign i_type_jalr = opcode == 7'b1100111;
-assign i_type_load = opcode == 7'b0000011;
+assign i_type_load = opcode == 7'b0000011
+`ifdef VIGNA_CORE_F_EXTENSION
+                   || opcode == 7'b0000111  // Include FLW
+`endif
+                   ;
 
 `ifdef VIGNA_CORE_ZICSR_EXTENSION
 wire i_type_system;
@@ -182,7 +190,11 @@ assign i_type = i_type_alu || i_type_jalr || i_type_load || i_type_system;
 `else
 assign i_type = i_type_alu || i_type_jalr || i_type_load;
 `endif
-assign s_type = opcode == 7'b0100011;
+assign s_type = opcode == 7'b0100011 
+`ifdef VIGNA_CORE_F_EXTENSION
+              || opcode == 7'b0100111  // Include FSW
+`endif
+              ;
 assign u_type = is_lui || is_auipc;
 assign b_type = opcode == 7'b1100011;
 assign j_type = opcode == 7'b1101111;
@@ -377,6 +389,20 @@ wire is_m_coproc;
 assign is_m_coproc = r_type && funct7 == 7'b0000001;
 `endif
 
+`ifdef VIGNA_CORE_F_EXTENSION
+//f type - floating point instructions
+wire f_type, f_load_type, f_store_type;
+assign f_type = opcode == 7'b1010011;        // 0x53 - FP computational
+assign f_load_type = opcode == 7'b0000111;   // 0x07 - FLW
+assign f_store_type = opcode == 7'b0100111;  // 0x27 - FSW
+
+wire is_f_coproc;
+wire is_flw, is_fsw;
+assign is_f_coproc = f_type;
+assign is_flw = f_load_type && funct3 == 3'b010;  // FLW
+assign is_fsw = f_store_type && funct3 == 3'b010; // FSW
+`endif
+
 `ifdef VIGNA_CORE_ZICSR_EXTENSION
 //csr type (system instructions)
 wire is_csrrw, is_csrrs, is_csrrc, is_csrrwi, is_csrrsi, is_csrrci;
@@ -415,6 +441,24 @@ wire [31:0] rs2_val;
     reg [31:0] cpu_regs[31:1];
     assign rs1_val = rs1 == 0 ? 32'd0 : cpu_regs[rs1];
     assign rs2_val = rs2 == 0 ? 32'd0 : cpu_regs[rs2];
+`endif
+
+`ifdef VIGNA_CORE_F_EXTENSION
+// Floating point register file (32 x 32-bit registers)
+reg [31:0] fp_regs[31:0];
+
+// FP register read ports
+wire [4:0] frs1, frs2, frd;
+assign frs1 = effective_inst[19:15];  // Source register 1
+assign frs2 = effective_inst[24:20];  // Source register 2  
+assign frd  = effective_inst[11:7];   // Destination register
+
+wire [31:0] frs1_val, frs2_val;
+assign frs1_val = fp_regs[frs1];
+assign frs2_val = fp_regs[frs2];
+
+// Floating point CSR (FCSR) - basic implementation
+reg [31:0] fcsr;
 `endif
 
 `ifdef VIGNA_CORE_ZICSR_EXTENSION
@@ -572,6 +616,11 @@ reg [3:0] ex_type;
 reg [3:0] ls_strb;
 reg ls_sign_extend;
 
+`ifdef VIGNA_CORE_F_EXTENSION
+reg is_fp_load; // Flag to track if current operation is FP load
+reg [4:0] fp_wb_reg; // FP destination register for loads
+`endif
+
 assign pc_next =  interrupt_taken     ? interrupt_cause :
                   `ifdef VIGNA_CORE_INTERRUPT
                   (ex_jump && is_mret)  ? mepc :
@@ -601,6 +650,23 @@ wire is_jump = is_jal || is_jalr;
         .op2(d2),
         .result(m_result),
         .func(d3[2:0])
+    );
+`endif
+
+`ifdef VIGNA_CORE_F_EXTENSION
+    reg f_valid;
+    wire f_ready;
+    wire [31:0] f_result;
+    vigna_f_ext fp_unit(
+        .clk(clk),
+        .resetn(resetn),
+        .valid(f_valid),
+        .ready(f_ready),
+        .op1(d1),
+        .op2(d2),
+        .result(f_result),
+        .func(funct3),
+        .func2(funct7[4:0])  // Upper 5 bits of funct7 for F extension
     );
 `endif
 
@@ -648,6 +714,17 @@ always @ (posedge clk) begin
         `ifdef VIGNA_CORE_STACK_ADDR_RESET_ENABLE
             cpu_regs[2] <= `VIGNA_CORE_STACK_ADDR_RESET_VALUE;
         `endif
+        
+        `ifdef VIGNA_CORE_F_EXTENSION
+        // Reset all FP registers to 0 (positive zero in IEEE 754)
+        for (integer i = 0; i <= 31; i = i + 1)
+            fp_regs[i] <= 32'h00000000;
+        fcsr <= 32'h00000000;  // Reset FCSR
+        f_valid <= 0;
+        is_fp_load <= 0;
+        fp_wb_reg <= 0;
+        `endif
+        
         shift_cnt <= 0;
         l_sll_srl_sra <= 0;
         `ifdef VIGNA_CORE_INTERRUPT
@@ -697,7 +774,15 @@ always @ (posedge clk) begin
                     d2 <= op2;
                     `endif
                     if (s_type) begin
+                        `ifdef VIGNA_CORE_F_EXTENSION
+                        if (is_fsw) begin
+                            d3 <= frs2_val;  // Use FP register for FSW
+                        end else begin
+                            d3 <= rs2_val;   // Use integer register for regular stores
+                        end
+                        `else
                         d3 <= rs2_val;
+                        `endif
                     end else if (b_type) begin
                         d3 <= inst_add_result;
                     end else if (is_jal || is_jalr) begin
@@ -711,6 +796,17 @@ always @ (posedge clk) begin
                         d3[2:0] <= funct3;
                         m_valid   <= 1;
                     `endif
+                    `ifdef VIGNA_CORE_F_EXTENSION
+                    end else if (is_f_coproc) begin
+                        // For FP operations, use FP register sources
+                        d1 <= frs1_val;
+                        d2 <= frs2_val;
+                        f_valid <= 1;
+                    end else if (is_flw) begin
+                        // FP load: d1 and d2 are already set correctly, just set flags
+                        is_fp_load <= 1;
+                        fp_wb_reg <= frd;
+                    `endif
                     end
                                     
                     if (u_type || j_type || i_type || r_type) begin
@@ -719,6 +815,11 @@ always @ (posedge clk) begin
                         `else 
                             wb_reg <= rd;
                         `endif
+                    `ifdef VIGNA_CORE_F_EXTENSION
+                    end else if (is_flw) begin
+                        // FP loads don't write to integer registers
+                        wb_reg <= 0;
+                    `endif
                     end else begin
                         wb_reg <= 0;
                     end
@@ -744,6 +845,15 @@ always @ (posedge clk) begin
                         exec_state <= 4'b1001;
                     end
                     `endif
+                    `ifdef VIGNA_CORE_F_EXTENSION
+                    else if (is_f_coproc) begin
+                        exec_state <= 4'b1011;  // FP computation state (changed from 1010)
+                    end
+                    else if (is_flw || is_fsw) begin
+                        exec_state <= 4'b0001;  // Use memory access state
+                        write_mem <= is_fsw ? 1'b1 : 1'b0;
+                    end
+                    `endif
                     `ifdef VIGNA_CORE_ZICSR_EXTENSION
                     else if (is_csr_op) begin
                         exec_state <= 4'b1010;
@@ -757,8 +867,14 @@ always @ (posedge clk) begin
                     if (is_lw || is_sw) ls_strb <= 4'b1111;
                     else if (is_lh || is_lhu || is_sh) ls_strb <= 4'b0011;
                     else if (is_lb || is_lbu || is_sb) ls_strb <= 4'b0001;
+                    `ifdef VIGNA_CORE_F_EXTENSION
+                    else if (is_flw || is_fsw) ls_strb <= 4'b1111;  // FP operations are 32-bit
+                    `endif
 
                     if (is_lw || is_lh || is_lb) ls_sign_extend <= 1;
+                    `ifdef VIGNA_CORE_F_EXTENSION
+                    else if (is_flw) ls_sign_extend <= 0;  // FP loads don't sign extend
+                    `endif
                     else ls_sign_extend <= 0;
                 end
             end
@@ -814,6 +930,13 @@ always @ (posedge clk) begin
                 if (d_ready) begin
                     exec_state <= 0;
                     d_valid    <= 0;
+                    `ifdef VIGNA_CORE_F_EXTENSION
+                    if (is_fp_load) begin
+                        // FP load - store directly to FP register, no sign extension
+                        fp_regs[fp_wb_reg] <= d_rdata;
+                        is_fp_load <= 0;  // Clear the flag
+                    end else
+                    `endif
                     if (wb_reg != 0) begin
                         `ifdef VIGNA_CORE_ALIGNMENT
                             case ({shift_cnt[1:0], ls_strb})
@@ -904,6 +1027,16 @@ always @ (posedge clk) begin
                 `ifdef VIGNA_CORE_INTERRUPT
                 end
                 `endif
+            end
+            `endif
+            `ifdef VIGNA_CORE_F_EXTENSION
+            4'b1011: begin
+                // Floating point operation completion
+                f_valid <= 0;
+                if (f_ready) begin
+                    fp_regs[frd] <= f_result;  // Write result to FP register
+                    exec_state <= 0;
+                end
             end
             `endif
             default: begin
