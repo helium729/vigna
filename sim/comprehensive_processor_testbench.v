@@ -461,8 +461,10 @@ module comprehensive_processor_testbench();
         resetn = 1;
         test_branch_operations();
         
+
         // Test 4: CSR operations (only if extension is enabled)
         `ifdef VIGNA_CORE_ZICSR_EXTENSION
+      
         resetn = 0;
         for (integer i = 0; i < 1024; i = i + 1) begin
             instruction_memory[i] = 32'h00000013;
@@ -471,6 +473,20 @@ module comprehensive_processor_testbench();
         repeat(5) @(posedge clk);
         resetn = 1;
         test_csr_operations();
+        `endif
+      
+
+        // Test 5: C extension operations (only if enabled)
+        `ifdef VIGNA_CORE_C_EXTENSION
+
+        resetn = 0;
+        for (integer i = 0; i < 1024; i = i + 1) begin
+            instruction_memory[i] = 32'h00000013;
+            data_memory[i] = 32'h00000000;
+        end
+        repeat(5) @(posedge clk);
+        resetn = 1;
+        test_c_extension_operations();
         `endif
         
         $display("\nComprehensive Test Summary:");
@@ -487,5 +503,37 @@ module comprehensive_processor_testbench();
         
         $finish;
     end
+    
+    // Test C extension operations
+    task test_c_extension_operations;
+        begin
+            $display("Setting up C extension operations test...");
+            
+            // Test C.LI x1, 10 (load immediate 10 into x1)
+            // C.LI format: 010_0_00001_01010_01 = 0x40a9
+            instruction_memory[0] = {16'h0000, 16'h40a9};
+            
+            // Test C.ADDI x1, 5 (add immediate 5 to x1)  
+            // C.ADDI format: 000_0_00001_00101_01 = 0x0095
+            instruction_memory[1] = {16'h0000, 16'h0095};
+            
+            // Store result using regular SW instruction
+            instruction_memory[2] = make_s_type(12'd12, 5'd1, 5'd0, 3'b010, 7'b0100011); // SW x1, 12(x0)
+            
+            // Infinite loop to halt
+            instruction_memory[3] = make_i_type(-12'd4, 5'd0, 3'b000, 5'd0, 7'b1100111); // JALR x0, x0, -4
+            
+            run_test_sequence("C Extension Operations", 150);
+            
+            // Verify C.LI x1, 10 + C.ADDI x1, 5 = 15
+            if (data_memory[3] == 32'd15) begin
+                $display("  PASS: C extension result = %d (expected 15)", data_memory[3]);
+                test_pass_count = test_pass_count + 1;
+            end else begin
+                $display("  FAIL: C extension result = %d (expected 15)", data_memory[3]);
+                test_fail_count = test_fail_count + 1;
+            end
+        end
+    endtask
 
 endmodule
