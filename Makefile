@@ -16,21 +16,24 @@ SIM_SOURCES = $(SIM_DIR)/mem_sim.v
 TESTBENCH = processor_testbench
 ENHANCED_TESTBENCH = enhanced_processor_testbench
 COMPREHENSIVE_TESTBENCH = comprehensive_processor_testbench
+PROGRAM_TESTBENCH = program_testbench
 AXI_TESTBENCH = vigna_axi_testbench
 VVP_FILE = $(SIM_DIR)/$(TESTBENCH).vvp
 ENHANCED_VVP_FILE = $(SIM_DIR)/$(ENHANCED_TESTBENCH).vvp
 COMPREHENSIVE_VVP_FILE = $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).vvp
+PROGRAM_VVP_FILE = $(SIM_DIR)/$(PROGRAM_TESTBENCH).vvp
 AXI_VVP_FILE = $(SIM_DIR)/$(AXI_TESTBENCH).vvp
 VCD_FILE = $(SIM_DIR)/processor_test.vcd
 ENHANCED_VCD_FILE = $(SIM_DIR)/enhanced_processor_test.vcd
 COMPREHENSIVE_VCD_FILE = $(SIM_DIR)/comprehensive_processor_test.vcd
+PROGRAM_VCD_FILE = $(SIM_DIR)/program_test.vcd
 AXI_VCD_FILE = $(SIM_DIR)/vigna_axi_test.vcd
 
 # Default target
 all: comprehensive_test
 
 # Test all interfaces
-test_all: comprehensive_test axi_test
+test_all: comprehensive_test program_test axi_test
 
 # Compile basic testbench
 $(VVP_FILE): $(CORE_SOURCES) $(SIM_DIR)/$(TESTBENCH).v
@@ -43,6 +46,10 @@ $(ENHANCED_VVP_FILE): $(CORE_SOURCES) $(SIM_DIR)/$(ENHANCED_TESTBENCH).v
 # Compile comprehensive testbench
 $(COMPREHENSIVE_VVP_FILE): $(CORE_SOURCES) $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).v
 	$(IVERILOG) -o $(COMPREHENSIVE_VVP_FILE) -I. $(CORE_SOURCES) $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).v
+
+# Compile program testbench
+$(PROGRAM_VVP_FILE): $(CORE_SOURCES) $(SIM_DIR)/$(PROGRAM_TESTBENCH).v
+	$(IVERILOG) -o $(PROGRAM_VVP_FILE) -I. $(CORE_SOURCES) $(SIM_DIR)/$(PROGRAM_TESTBENCH).v
 
 # Compile AXI testbench
 $(AXI_VVP_FILE): vigna_axi.v $(CORE_SOURCES) $(SIM_DIR)/$(AXI_TESTBENCH).v
@@ -60,6 +67,10 @@ enhanced_test: $(ENHANCED_VVP_FILE)
 comprehensive_test: $(COMPREHENSIVE_VVP_FILE)
 	cd $(SIM_DIR) && $(VVP) $(COMPREHENSIVE_TESTBENCH).vvp
 
+# Run program simulation
+program_test: $(PROGRAM_VVP_FILE)
+	cd $(SIM_DIR) && $(VVP) $(PROGRAM_TESTBENCH).vvp
+
 # Run AXI simulation
 axi_test: $(AXI_VVP_FILE)
 	cd $(SIM_DIR) && $(VVP) $(AXI_TESTBENCH).vvp
@@ -74,6 +85,9 @@ enhanced_wave: $(ENHANCED_VCD_FILE)
 comprehensive_wave: $(COMPREHENSIVE_VCD_FILE)
 	$(GTKWAVE) $(COMPREHENSIVE_VCD_FILE) &
 
+program_wave: $(PROGRAM_VCD_FILE)
+	$(GTKWAVE) $(PROGRAM_VCD_FILE) &
+
 axi_wave: $(AXI_VCD_FILE)
 	$(GTKWAVE) $(AXI_VCD_FILE) &
 
@@ -87,12 +101,15 @@ enhanced_syntax:
 comprehensive_syntax:
 	$(IVERILOG) -t null -I. $(CORE_SOURCES) $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).v
 
+program_syntax:
+	$(IVERILOG) -t null -I. $(CORE_SOURCES) $(SIM_DIR)/$(PROGRAM_TESTBENCH).v
+
 axi_syntax:
 	$(IVERILOG) -t null -I. vigna_axi.v $(CORE_SOURCES) $(SIM_DIR)/$(AXI_TESTBENCH).v
 
 # Clean generated files
 clean:
-	rm -f $(VVP_FILE) $(VCD_FILE) $(ENHANCED_VVP_FILE) $(ENHANCED_VCD_FILE) $(COMPREHENSIVE_VVP_FILE) $(COMPREHENSIVE_VCD_FILE) $(AXI_VVP_FILE) $(AXI_VCD_FILE)
+	rm -f $(VVP_FILE) $(VCD_FILE) $(ENHANCED_VVP_FILE) $(ENHANCED_VCD_FILE) $(COMPREHENSIVE_VVP_FILE) $(COMPREHENSIVE_VCD_FILE) $(PROGRAM_VVP_FILE) $(PROGRAM_VCD_FILE) $(AXI_VVP_FILE) $(AXI_VCD_FILE)
 
 # Quick test without waveform dumping
 quick_test:
@@ -110,9 +127,14 @@ comprehensive_quick_test:
 	$(VVP) /tmp/comprehensive_test.vvp
 	rm -f /tmp/comprehensive_test.vvp
 
+program_quick_test:
+	$(IVERILOG) -o /tmp/program_test.vvp -I. $(CORE_SOURCES) $(SIM_DIR)/$(PROGRAM_TESTBENCH).v
+	$(VVP) /tmp/program_test.vvp
+	rm -f /tmp/program_test.vvp
+
 axi_quick_test:
 	$(IVERILOG) -o /tmp/axi_test.vvp -I. vigna_axi.v $(CORE_SOURCES) $(SIM_DIR)/$(AXI_TESTBENCH).v
 	$(VVP) /tmp/axi_test.vvp
 	rm -f /tmp/axi_test.vvp
 
-.PHONY: all test_all test enhanced_test comprehensive_test axi_test wave enhanced_wave comprehensive_wave axi_wave syntax enhanced_syntax comprehensive_syntax axi_syntax clean quick_test enhanced_quick_test comprehensive_quick_test axi_quick_test
+.PHONY: all test_all test enhanced_test comprehensive_test program_test axi_test wave enhanced_wave comprehensive_wave program_wave axi_wave syntax enhanced_syntax comprehensive_syntax program_syntax axi_syntax clean quick_test enhanced_quick_test comprehensive_quick_test program_quick_test axi_quick_test
