@@ -27,18 +27,21 @@ CONF_C_TEST = vigna_conf_c_test.vh
 TESTBENCH = processor_testbench
 ENHANCED_TESTBENCH = enhanced_processor_testbench
 COMPREHENSIVE_TESTBENCH = comprehensive_processor_testbench
+C_EXTENSION_TESTBENCH = c_extension_testbench
 PROGRAM_TESTBENCH = program_testbench
 INTERRUPT_TESTBENCH = interrupt_test
 AXI_TESTBENCH = vigna_axi_testbench
 VVP_FILE = $(SIM_DIR)/$(TESTBENCH).vvp
 ENHANCED_VVP_FILE = $(SIM_DIR)/$(ENHANCED_TESTBENCH).vvp
 COMPREHENSIVE_VVP_FILE = $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).vvp
+C_EXTENSION_VVP_FILE = $(SIM_DIR)/$(C_EXTENSION_TESTBENCH).vvp
 PROGRAM_VVP_FILE = $(SIM_DIR)/$(PROGRAM_TESTBENCH).vvp
 INTERRUPT_VVP_FILE = $(SIM_DIR)/$(INTERRUPT_TESTBENCH).vvp
 AXI_VVP_FILE = $(SIM_DIR)/$(AXI_TESTBENCH).vvp
 VCD_FILE = $(SIM_DIR)/processor_test.vcd
 ENHANCED_VCD_FILE = $(SIM_DIR)/enhanced_processor_test.vcd
 COMPREHENSIVE_VCD_FILE = $(SIM_DIR)/comprehensive_processor_test.vcd
+C_EXTENSION_VCD_FILE = $(SIM_DIR)/c_extension_test.vcd
 PROGRAM_VCD_FILE = $(SIM_DIR)/program_test.vcd
 INTERRUPT_VCD_FILE = $(SIM_DIR)/interrupt_test.vcd
 AXI_VCD_FILE = $(SIM_DIR)/vigna_axi_test.vcd
@@ -64,6 +67,10 @@ $(ENHANCED_VVP_FILE): $(CORE_SOURCES) $(SIM_DIR)/$(ENHANCED_TESTBENCH).v $(CONF_
 $(COMPREHENSIVE_VVP_FILE): $(CORE_SOURCES) $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).v $(CONF_DEFAULT)
 	$(IVERILOG) -o $(COMPREHENSIVE_VVP_FILE) -I. $(CORE_SOURCES) $(CONF_DEFAULT) $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).v
 
+# Compile C extension testbench
+$(C_EXTENSION_VVP_FILE): $(CORE_SOURCES) $(SIM_DIR)/$(C_EXTENSION_TESTBENCH).v $(CONF_C_TEST)
+	$(IVERILOG) -o $(C_EXTENSION_VVP_FILE) -I. $(CORE_SOURCES) $(CONF_C_TEST) $(SIM_DIR)/$(C_EXTENSION_TESTBENCH).v
+
 # Compile program testbench
 $(PROGRAM_VVP_FILE): $(CORE_SOURCES) $(SIM_DIR)/$(PROGRAM_TESTBENCH).v $(CONF_DEFAULT)
 	$(IVERILOG) -o $(PROGRAM_VVP_FILE) -I. $(CORE_SOURCES) $(CONF_DEFAULT) $(SIM_DIR)/$(PROGRAM_TESTBENCH).v
@@ -87,6 +94,10 @@ enhanced_test: $(ENHANCED_VVP_FILE)
 # Run comprehensive simulation
 comprehensive_test: $(COMPREHENSIVE_VVP_FILE)
 	cd $(SIM_DIR) && $(VVP) $(COMPREHENSIVE_TESTBENCH).vvp
+
+# Run C extension simulation
+c_extension_test: $(C_EXTENSION_VVP_FILE)
+	cd $(SIM_DIR) && $(VVP) $(C_EXTENSION_TESTBENCH).vvp
 
 
 # Run program simulation
@@ -164,6 +175,9 @@ interrupt_wave: $(INTERRUPT_VCD_FILE)
 axi_wave: $(AXI_VCD_FILE)
 	$(GTKWAVE) $(AXI_VCD_FILE) &
 
+c_extension_wave: $(C_EXTENSION_VCD_FILE)
+	$(GTKWAVE) $(C_EXTENSION_VCD_FILE) &
+
 # Syntax check
 syntax:
 	$(IVERILOG) -t null -I. $(CORE_SOURCES) $(CONF_DEFAULT) $(SIM_DIR)/$(TESTBENCH).v
@@ -173,6 +187,9 @@ enhanced_syntax:
 
 comprehensive_syntax:
 	$(IVERILOG) -t null -I. $(CORE_SOURCES) $(CONF_DEFAULT) $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).v
+
+c_extension_syntax:
+	$(IVERILOG) -t null -I. $(CORE_SOURCES) $(CONF_C_TEST) $(SIM_DIR)/$(C_EXTENSION_TESTBENCH).v
 
 program_syntax:
 	$(IVERILOG) -t null -I. $(CORE_SOURCES) $(CONF_DEFAULT) $(SIM_DIR)/$(PROGRAM_TESTBENCH).v
@@ -226,6 +243,11 @@ comprehensive_quick_test:
 	$(IVERILOG) -o /tmp/comprehensive_test.vvp -I. $(CORE_SOURCES) $(CONF_DEFAULT) $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).v
 	$(VVP) /tmp/comprehensive_test.vvp
 	rm -f /tmp/comprehensive_test.vvp
+
+c_extension_quick_test:
+	$(IVERILOG) -o /tmp/c_extension_test.vvp -I. $(CORE_SOURCES) $(CONF_C_TEST) $(SIM_DIR)/$(C_EXTENSION_TESTBENCH).v
+	$(VVP) /tmp/c_extension_test.vvp
+	rm -f /tmp/c_extension_test.vvp
 
 
 program_quick_test:
