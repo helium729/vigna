@@ -30,18 +30,21 @@ COMPREHENSIVE_TESTBENCH = comprehensive_processor_testbench
 PROGRAM_TESTBENCH = program_testbench
 INTERRUPT_TESTBENCH = interrupt_test
 AXI_TESTBENCH = vigna_axi_testbench
+C_EXTENSION_TESTBENCH = c_extension_testbench
 VVP_FILE = $(SIM_DIR)/$(TESTBENCH).vvp
 ENHANCED_VVP_FILE = $(SIM_DIR)/$(ENHANCED_TESTBENCH).vvp
 COMPREHENSIVE_VVP_FILE = $(SIM_DIR)/$(COMPREHENSIVE_TESTBENCH).vvp
 PROGRAM_VVP_FILE = $(SIM_DIR)/$(PROGRAM_TESTBENCH).vvp
 INTERRUPT_VVP_FILE = $(SIM_DIR)/$(INTERRUPT_TESTBENCH).vvp
 AXI_VVP_FILE = $(SIM_DIR)/$(AXI_TESTBENCH).vvp
+C_EXTENSION_VVP_FILE = $(SIM_DIR)/$(C_EXTENSION_TESTBENCH).vvp
 VCD_FILE = $(SIM_DIR)/processor_test.vcd
 ENHANCED_VCD_FILE = $(SIM_DIR)/enhanced_processor_test.vcd
 COMPREHENSIVE_VCD_FILE = $(SIM_DIR)/comprehensive_processor_test.vcd
 PROGRAM_VCD_FILE = $(SIM_DIR)/program_test.vcd
 INTERRUPT_VCD_FILE = $(SIM_DIR)/interrupt_test.vcd
 AXI_VCD_FILE = $(SIM_DIR)/vigna_axi_test.vcd
+C_EXTENSION_VCD_FILE = $(SIM_DIR)/c_extension_test.vcd
 
 # Default target
 all: comprehensive_test interrupt_test
@@ -76,6 +79,10 @@ $(INTERRUPT_VVP_FILE): $(CORE_SOURCES) $(SIM_DIR)/$(INTERRUPT_TESTBENCH).v
 $(AXI_VVP_FILE): vigna_axi.v $(CORE_SOURCES) $(SIM_DIR)/$(AXI_TESTBENCH).v $(CONF_DEFAULT)
 	$(IVERILOG) -o $(AXI_VVP_FILE) -I. vigna_axi.v $(CORE_SOURCES) $(CONF_DEFAULT) $(SIM_DIR)/$(AXI_TESTBENCH).v
 
+# Compile C extension testbench
+$(C_EXTENSION_VVP_FILE): $(CORE_SOURCES) $(SIM_DIR)/$(C_EXTENSION_TESTBENCH).v $(CONF_C_TEST)
+	$(IVERILOG) -o $(C_EXTENSION_VVP_FILE) -I. $(CORE_SOURCES) $(CONF_C_TEST) $(SIM_DIR)/$(C_EXTENSION_TESTBENCH).v
+
 # Run basic simulation
 test: $(VVP_FILE)
 	cd $(SIM_DIR) && $(VVP) $(TESTBENCH).vvp
@@ -100,6 +107,10 @@ interrupt_test: $(INTERRUPT_VVP_FILE)
 # Run AXI simulation
 axi_test: $(AXI_VVP_FILE)
 	cd $(SIM_DIR) && $(VVP) $(AXI_TESTBENCH).vvp
+
+# Run C extension test
+c_extension_test: $(C_EXTENSION_VVP_FILE)
+	cd $(SIM_DIR) && $(VVP) $(C_EXTENSION_TESTBENCH).vvp
 
 # Configuration-specific tests
 test_rv32i:
@@ -164,6 +175,9 @@ interrupt_wave: $(INTERRUPT_VCD_FILE)
 axi_wave: $(AXI_VCD_FILE)
 	$(GTKWAVE) $(AXI_VCD_FILE) &
 
+c_extension_wave: $(C_EXTENSION_VCD_FILE)
+	$(GTKWAVE) $(C_EXTENSION_VCD_FILE) &
+
 # Syntax check
 syntax:
 	$(IVERILOG) -t null -I. $(CORE_SOURCES) $(CONF_DEFAULT) $(SIM_DIR)/$(TESTBENCH).v
@@ -182,6 +196,9 @@ interrupt_syntax:
 
 axi_syntax:
 	$(IVERILOG) -t null -I. vigna_axi.v $(CORE_SOURCES) $(CONF_DEFAULT) $(SIM_DIR)/$(AXI_TESTBENCH).v
+
+c_extension_syntax:
+	$(IVERILOG) -t null -I. $(CORE_SOURCES) $(CONF_C_TEST) $(SIM_DIR)/$(C_EXTENSION_TESTBENCH).v
 
 # Configuration-specific syntax checks
 syntax_all_configs: syntax_rv32i syntax_rv32im syntax_rv32ic syntax_rv32imc syntax_rv32e syntax_rv32im_zicsr syntax_rv32imc_zicsr
@@ -209,7 +226,7 @@ syntax_rv32imc_zicsr:
 
 # Clean generated files
 clean:
-	rm -f $(VVP_FILE) $(VCD_FILE) $(ENHANCED_VVP_FILE) $(ENHANCED_VCD_FILE) $(COMPREHENSIVE_VVP_FILE) $(COMPREHENSIVE_VCD_FILE) $(PROGRAM_VVP_FILE) $(PROGRAM_VCD_FILE) $(AXI_VVP_FILE) $(AXI_VCD_FILE) $(INTERRUPT_VVP_FILE)  $(INTERRUPT_VCD_FILE)
+	rm -f $(VVP_FILE) $(VCD_FILE) $(ENHANCED_VVP_FILE) $(ENHANCED_VCD_FILE) $(COMPREHENSIVE_VVP_FILE) $(COMPREHENSIVE_VCD_FILE) $(PROGRAM_VVP_FILE) $(PROGRAM_VCD_FILE) $(AXI_VVP_FILE) $(AXI_VCD_FILE) $(INTERRUPT_VVP_FILE) $(INTERRUPT_VCD_FILE) $(C_EXTENSION_VVP_FILE) $(C_EXTENSION_VCD_FILE)
 
 # Quick test without waveform dumping
 quick_test:
@@ -244,6 +261,11 @@ axi_quick_test:
 	$(VVP) /tmp/axi_test.vvp
 	rm -f /tmp/axi_test.vvp
 
+c_extension_quick_test:
+	$(IVERILOG) -o /tmp/c_extension_test.vvp -I. $(CORE_SOURCES) $(CONF_C_TEST) $(SIM_DIR)/$(C_EXTENSION_TESTBENCH).v
+	$(VVP) /tmp/c_extension_test.vvp
+	rm -f /tmp/c_extension_test.vvp
+
 
 # Configuration-specific program tests
 program_test_rv32im_zicsr:
@@ -260,10 +282,10 @@ program_test_rv32imc_zicsr:
 	$(VVP) /tmp/program_rv32imc_zicsr.vvp
 	rm -f /tmp/program_rv32imc_zicsr.vvp
 
-.PHONY: all test_all_configs test_all test enhanced_test comprehensive_test program_test axi_test interrupt_test \
+.PHONY: all test_all_configs test_all test enhanced_test comprehensive_test program_test axi_test interrupt_test c_extension_test \
 	test_rv32i test_rv32im test_rv32ic test_rv32imc test_rv32e test_rv32im_zicsr test_rv32imc_zicsr \
-	wave enhanced_wave comprehensive_wave program_wave axi_wave \
-	syntax enhanced_syntax comprehensive_syntax program_syntax axi_syntax \
+	wave enhanced_wave comprehensive_wave program_wave axi_wave c_extension_wave \
+	syntax enhanced_syntax comprehensive_syntax program_syntax axi_syntax c_extension_syntax \
 	syntax_all_configs syntax_rv32i syntax_rv32im syntax_rv32ic syntax_rv32imc syntax_rv32e syntax_rv32im_zicsr syntax_rv32imc_zicsr \
-	clean quick_test enhanced_quick_test comprehensive_quick_test program_quick_test axi_quick_test \
+	clean quick_test enhanced_quick_test comprehensive_quick_test program_quick_test axi_quick_test c_extension_quick_test \
 	program_test_rv32im_zicsr program_test_rv32imc_zicsr
