@@ -163,9 +163,18 @@ assign i_type_alu  = opcode == 7'b0010011;
 assign i_type_jalr = opcode == 7'b1100111;
 assign i_type_load = opcode == 7'b0000011;
 
+`ifdef VIGNA_CORE_ZICSR_EXTENSION
+wire i_type_system;
+assign i_type_system = opcode == 7'b1110011;
+`endif
+
 wire r_type, i_type, s_type, u_type, b_type, j_type;
 assign r_type = opcode == 7'b0110011;
+`ifdef VIGNA_CORE_ZICSR_EXTENSION
+assign i_type = i_type_alu || i_type_jalr || i_type_load || i_type_system;
+`else
 assign i_type = i_type_alu || i_type_jalr || i_type_load;
+`endif
 assign s_type = opcode == 7'b0100011;
 assign u_type = is_lui || is_auipc;
 assign b_type = opcode == 7'b1100011;
@@ -361,6 +370,20 @@ wire is_m_coproc;
 assign is_m_coproc = r_type && funct7 == 7'b0000001;
 `endif
 
+`ifdef VIGNA_CORE_ZICSR_EXTENSION
+//csr type (system instructions)
+wire is_csrrw, is_csrrs, is_csrrc, is_csrrwi, is_csrrsi, is_csrrci;
+assign is_csrrw  = i_type_system && funct3 == 3'b001;
+assign is_csrrs  = i_type_system && funct3 == 3'b010;
+assign is_csrrc  = i_type_system && funct3 == 3'b011;
+assign is_csrrwi = i_type_system && funct3 == 3'b101;
+assign is_csrrsi = i_type_system && funct3 == 3'b110;
+assign is_csrrci = i_type_system && funct3 == 3'b111;
+
+wire is_csr_op;
+assign is_csr_op = is_csrrw || is_csrrs || is_csrrc || is_csrrwi || is_csrrsi || is_csrrci;
+`endif
+
 //rs1 from reg
 wire [31:0] rs1_val;
 //rs2 from reg
@@ -377,12 +400,33 @@ wire [31:0] rs2_val;
     assign rs2_val = rs2 == 0 ? 32'd0 : cpu_regs[rs2];
 `endif
 
+`ifdef VIGNA_CORE_ZICSR_EXTENSION
+//csr regs - implementing basic set for now
+reg [31:0] csr_regs[4095:0];  // Full CSR address space
+wire [11:0] csr_addr;
+assign csr_addr = imm[11:0];  // CSR address is in immediate field
+
+// CSR read value
+wire [31:0] csr_rval;
+assign csr_rval = csr_regs[csr_addr];
+`endif
+
 wire [31:0] op1, op2;
+`ifdef VIGNA_CORE_ZICSR_EXTENSION
+assign op1 = is_jal || u_type   ? imm : 
+             is_csr_op          ? csr_rval : rs1_val;
+assign op2 = (r_type || b_type)   ? rs2_val :
+             (is_auipc || j_type) ? inst_addr :
+             (is_slli || is_srli) ? {27'b0, shamt} :
+             is_lui               ? 32'd0 :
+             ((is_csrrwi || is_csrrsi || is_csrrci) ? {27'b0, rs1} : imm);
+`else
 assign op1 = is_jal || u_type   ? imm : rs1_val;
-assign op2 = r_type || b_type   ? rs2_val :
-             is_auipc || j_type ? inst_addr :
-             is_slli || is_srli ? {27'b0, shamt} :
-             is_lui             ? 32'd0 : imm; 
+assign op2 = (r_type || b_type)   ? rs2_val :
+             (is_auipc || j_type) ? inst_addr :
+             (is_slli || is_srli) ? {27'b0, shamt} :
+             is_lui               ? 32'd0 : imm; 
+`endif 
 
 //backend state
 reg [3:0] exec_state;
@@ -510,6 +554,12 @@ always @ (posedge clk) begin
         exec_state     <= 0;
         wb_reg         <= 0;
         ex_jump        <= 0;
+        `ifdef VIGNA_CORE_ZICSR_EXTENSION
+        // Initialize CSR registers to 0  
+        for (integer i = 0; i < 4096; i = i + 1) begin
+            csr_regs[i] <= 32'h00000000;
+        end
+        `endif
         ex_branch      <= 0;
         write_mem      <= 0;
         ls_strb        <= 0;
@@ -585,6 +635,11 @@ always @ (posedge clk) begin
                     `ifdef VIGNA_CORE_M_EXTENSION
                     else if (is_m_coproc) begin
                         exec_state <= 4'b1001;
+                    end
+                    `endif
+                    `ifdef VIGNA_CORE_ZICSR_EXTENSION
+                    else if (is_csr_op) begin
+                        exec_state <= 4'b1010;
                     end
                     `endif 
                     else begin
@@ -706,6 +761,32 @@ always @ (posedge clk) begin
                 end
             end
             `endif
+            `ifdef VIGNA_CORE_ZICSR_EXTENSION
+            4'b1010: begin
+                //csr operation
+                exec_state <= 0;
+                if (wb_reg != 0) begin
+                    cpu_regs[wb_reg] <= op1;  // write old CSR value to rd
+                end
+                // Update CSR based on operation type
+                if (is_csrrw || is_csrrwi) begin
+                    // CSR = rs1_val or imm
+                    csr_regs[csr_addr] <= (is_csrrwi) ? {27'b0, rs1} : rs1_val;
+                end
+                else if (is_csrrs || is_csrrsi) begin
+                    // CSR = CSR | (rs1_val or imm)
+                    if (rs1 != 0) begin // only write if rs1 != 0
+                        csr_regs[csr_addr] <= op1 | ((is_csrrsi) ? {27'b0, rs1} : rs1_val);
+                    end
+                end
+                else if (is_csrrc || is_csrrci) begin
+                    // CSR = CSR & ~(rs1_val or imm)
+                    if (rs1 != 0) begin // only write if rs1 != 0
+                        csr_regs[csr_addr] <= op1 & ~((is_csrrci) ? {27'b0, rs1} : rs1_val);
+                    end
+                end
+            end
+            `endif
             default: begin
                 exec_state <= 0;
             end
@@ -718,7 +799,11 @@ assign is_branch = is_beq || is_bne || is_blt || is_bge || is_bltu || is_bgeu;
 
 assign fetch_received = (exec_state == 4'b0000 && !is_jump && !is_branch)
                         || (exec_state == 4'b0100)
-                        || (exec_state == 4'b1000);
+                        || (exec_state == 4'b1000)
+                        `ifdef VIGNA_CORE_ZICSR_EXTENSION
+                        || (exec_state == 4'b1010)
+                        `endif
+                        ;
 
 endmodule
 

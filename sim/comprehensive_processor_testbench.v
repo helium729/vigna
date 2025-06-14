@@ -325,6 +325,100 @@ module comprehensive_processor_testbench();
         end
     endtask
     
+    // Test CSR operations
+    task test_csr_operations;
+        begin
+            $display("Setting up CSR operations test...");
+            
+            // Initialize a CSR address (using 0x300 which is a common CSR address)
+            // CSRRW x1, 0x300, x0    // Read CSR 0x300 to x1 (should be 0), write 0 to CSR
+            instruction_memory[0] = {12'h300, 5'd0, 3'b001, 5'd1, 7'b1110011};
+            
+            // ADDI x2, x0, 0x123     // Load test value into x2
+            instruction_memory[1] = make_i_type(12'h123, 5'd0, 3'b000, 5'd2, 7'b0010011);
+            
+            // CSRRW x3, 0x300, x2    // Write x2 to CSR 0x300, read old value to x3
+            instruction_memory[2] = {12'h300, 5'd2, 3'b001, 5'd3, 7'b1110011};
+            
+            // CSRRS x4, 0x300, x0    // Read CSR 0x300 to x4 (should be 0x123)
+            instruction_memory[3] = {12'h300, 5'd0, 3'b010, 5'd4, 7'b1110011};
+            
+            // ADDI x5, x0, 0x456     // Load another test value
+            instruction_memory[4] = make_i_type(12'h456, 5'd0, 3'b000, 5'd5, 7'b0010011);
+            
+            // CSRRS x6, 0x300, x5    // Set bits in CSR, read old to x6
+            instruction_memory[5] = {12'h300, 5'd5, 3'b010, 5'd6, 7'b1110011};
+            
+            // CSRRC x7, 0x300, x5    // Clear bits in CSR, read old to x7
+            instruction_memory[6] = {12'h300, 5'd5, 3'b011, 5'd7, 7'b1110011};
+            
+            // CSRRWI x8, 0x300, 0x1F // Write immediate to CSR, read old to x8
+            instruction_memory[7] = {12'h300, 5'd31, 3'b101, 5'd8, 7'b1110011};
+            
+            // Store results for verification
+            instruction_memory[8] = make_s_type(12'd0, 5'd1, 5'd0, 3'b010, 7'b0100011);   // SW x1, 0(x0)
+            instruction_memory[9] = make_s_type(12'd4, 5'd3, 5'd0, 3'b010, 7'b0100011);   // SW x3, 4(x0)
+            instruction_memory[10] = make_s_type(12'd8, 5'd4, 5'd0, 3'b010, 7'b0100011);  // SW x4, 8(x0)
+            instruction_memory[11] = make_s_type(12'd12, 5'd6, 5'd0, 3'b010, 7'b0100011); // SW x6, 12(x0)
+            instruction_memory[12] = make_s_type(12'd16, 5'd7, 5'd0, 3'b010, 7'b0100011); // SW x7, 16(x0)
+            instruction_memory[13] = make_s_type(12'd20, 5'd8, 5'd0, 3'b010, 7'b0100011); // SW x8, 20(x0)
+            
+            // Halt instruction
+            instruction_memory[14] = make_i_type(-12'd4, 5'd0, 3'b000, 5'd0, 7'b1100111);
+            
+            run_test_sequence("CSR Operations", 200);
+            
+            // Check results
+            if (data_memory[0] == 32'h00000000) begin
+                $display("  PASS: Initial CSR read = 0x%08x (expected 0x00000000)", data_memory[0]);
+                test_pass_count = test_pass_count + 1;
+            end else begin
+                $display("  FAIL: Initial CSR read = 0x%08x (expected 0x00000000)", data_memory[0]);
+                test_fail_count = test_fail_count + 1;
+            end
+            
+            if (data_memory[1] == 32'h00000000) begin
+                $display("  PASS: CSRRW old value = 0x%08x (expected 0x00000000)", data_memory[1]);
+                test_pass_count = test_pass_count + 1; 
+            end else begin
+                $display("  FAIL: CSRRW old value = 0x%08x (expected 0x00000000)", data_memory[1]);
+                test_fail_count = test_fail_count + 1;
+            end
+            
+            if (data_memory[2] == 32'h00000123) begin
+                $display("  PASS: CSR read after write = 0x%08x (expected 0x00000123)", data_memory[2]);
+                test_pass_count = test_pass_count + 1;
+            end else begin
+                $display("  FAIL: CSR read after write = 0x%08x (expected 0x00000123)", data_memory[2]);
+                test_fail_count = test_fail_count + 1;
+            end
+            
+            if (data_memory[3] == 32'h00000123) begin
+                $display("  PASS: CSRRS old value = 0x%08x (expected 0x00000123)", data_memory[3]);
+                test_pass_count = test_pass_count + 1;
+            end else begin
+                $display("  FAIL: CSRRS old value = 0x%08x (expected 0x00000123)", data_memory[3]);
+                test_fail_count = test_fail_count + 1;
+            end
+            
+            if (data_memory[4] == 32'h00000577) begin // 0x123 | 0x456 = 0x577
+                $display("  PASS: CSRRS old value = 0x%08x (expected 0x00000577)", data_memory[4]);
+                test_pass_count = test_pass_count + 1;
+            end else begin
+                $display("  FAIL: CSRRS old value = 0x%08x (expected 0x00000577)", data_memory[4]);
+                test_fail_count = test_fail_count + 1; 
+            end
+            
+            if (data_memory[5] == 32'h00000121) begin // 0x577 & ~0x456 = 0x121
+                $display("  PASS: CSRRWI old value = 0x%08x (expected 0x00000121)", data_memory[5]);
+                test_pass_count = test_pass_count + 1;
+            end else begin
+                $display("  FAIL: CSRRWI old value = 0x%08x (expected 0x00000121)", data_memory[5]);
+                test_fail_count = test_fail_count + 1;
+            end
+        end
+    endtask
+    
     // Main test sequence
     initial begin
         $dumpfile("comprehensive_processor_test.vcd");
@@ -367,8 +461,24 @@ module comprehensive_processor_testbench();
         resetn = 1;
         test_branch_operations();
         
-        // Test 4: C extension operations (only if enabled)
+
+        // Test 4: CSR operations (only if extension is enabled)
+        `ifdef VIGNA_CORE_ZICSR_EXTENSION
+      
+        resetn = 0;
+        for (integer i = 0; i < 1024; i = i + 1) begin
+            instruction_memory[i] = 32'h00000013;
+            data_memory[i] = 32'h00000000;
+        end
+        repeat(5) @(posedge clk);
+        resetn = 1;
+        test_csr_operations();
+        `endif
+      
+
+        // Test 5: C extension operations (only if enabled)
         `ifdef VIGNA_CORE_C_EXTENSION
+
         resetn = 0;
         for (integer i = 0; i < 1024; i = i + 1) begin
             instruction_memory[i] = 32'h00000013;
