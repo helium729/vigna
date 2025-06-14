@@ -172,7 +172,11 @@ assign funct7_sub_sra = funct7 == 7'b0100000;
 wire i_type_alu, i_type_jalr, i_type_load;
 assign i_type_alu  = opcode == 7'b0010011;
 assign i_type_jalr = opcode == 7'b1100111;
-assign i_type_load = opcode == 7'b0000011;
+assign i_type_load = opcode == 7'b0000011
+`ifdef VIGNA_CORE_F_EXTENSION
+                   || opcode == 7'b0000111  // Include FLW
+`endif
+                   ;
 
 `ifdef VIGNA_CORE_ZICSR_EXTENSION
 wire i_type_system;
@@ -186,7 +190,11 @@ assign i_type = i_type_alu || i_type_jalr || i_type_load || i_type_system;
 `else
 assign i_type = i_type_alu || i_type_jalr || i_type_load;
 `endif
-assign s_type = opcode == 7'b0100011;
+assign s_type = opcode == 7'b0100011 
+`ifdef VIGNA_CORE_F_EXTENSION
+              || opcode == 7'b0100111  // Include FSW
+`endif
+              ;
 assign u_type = is_lui || is_auipc;
 assign b_type = opcode == 7'b1100011;
 assign j_type = opcode == 7'b1101111;
@@ -608,6 +616,11 @@ reg [3:0] ex_type;
 reg [3:0] ls_strb;
 reg ls_sign_extend;
 
+`ifdef VIGNA_CORE_F_EXTENSION
+reg is_fp_load; // Flag to track if current operation is FP load
+reg [4:0] fp_wb_reg; // FP destination register for loads
+`endif
+
 assign pc_next =  interrupt_taken     ? interrupt_cause :
                   `ifdef VIGNA_CORE_INTERRUPT
                   (ex_jump && is_mret)  ? mepc :
@@ -708,6 +721,8 @@ always @ (posedge clk) begin
             fp_regs[i] <= 32'h00000000;
         fcsr <= 32'h00000000;  // Reset FCSR
         f_valid <= 0;
+        is_fp_load <= 0;
+        fp_wb_reg <= 0;
         `endif
         
         shift_cnt <= 0;
@@ -759,7 +774,15 @@ always @ (posedge clk) begin
                     d2 <= op2;
                     `endif
                     if (s_type) begin
+                        `ifdef VIGNA_CORE_F_EXTENSION
+                        if (is_fsw) begin
+                            d3 <= frs2_val;  // Use FP register for FSW
+                        end else begin
+                            d3 <= rs2_val;   // Use integer register for regular stores
+                        end
+                        `else
                         d3 <= rs2_val;
+                        `endif
                     end else if (b_type) begin
                         d3 <= inst_add_result;
                     end else if (is_jal || is_jalr) begin
@@ -780,14 +803,9 @@ always @ (posedge clk) begin
                         d2 <= frs2_val;
                         f_valid <= 1;
                     end else if (is_flw) begin
-                        // FP load: d1 = base address, d2 = offset
-                        d1 <= rs1_val;
-                        d2 <= imm;
-                    end else if (is_fsw) begin
-                        // FP store: d1 = base address, d2 = offset, d3 = FP value
-                        d1 <= rs1_val;
-                        d2 <= imm;
-                        d3 <= frs2_val;  // FP source register for store
+                        // FP load: d1 and d2 are already set correctly, just set flags
+                        is_fp_load <= 1;
+                        fp_wb_reg <= frd;
                     `endif
                     end
                                     
@@ -913,9 +931,10 @@ always @ (posedge clk) begin
                     exec_state <= 0;
                     d_valid    <= 0;
                     `ifdef VIGNA_CORE_F_EXTENSION
-                    if (is_flw) begin
+                    if (is_fp_load) begin
                         // FP load - store directly to FP register, no sign extension
-                        fp_regs[frd] <= d_rdata;
+                        fp_regs[fp_wb_reg] <= d_rdata;
+                        is_fp_load <= 0;  // Clear the flag
                     end else
                     `endif
                     if (wb_reg != 0) begin

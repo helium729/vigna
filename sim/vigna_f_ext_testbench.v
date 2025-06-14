@@ -177,9 +177,9 @@ module vigna_f_ext_testbench;
         // Load 2.0f from memory[1] to f2  
         instruction_memory[1] = 32'h00402107;  // FLW f2, 4(x0)
         // Store f1 to memory[4]
-        instruction_memory[2] = 32'h02102027;  // FSW f1, 16(x0) 
+        instruction_memory[2] = 32'h00102827;  // FSW f1, 16(x0) - CORRECTED
         // Store f2 to memory[5]
-        instruction_memory[3] = 32'h02202227;  // FSW f2, 20(x0)
+        instruction_memory[3] = 32'h00202A27;  // FSW f2, 20(x0) - CORRECTED
         // Halt
         instruction_memory[4] = 32'hFF800067; // JALR x0, -8(x0)
         
