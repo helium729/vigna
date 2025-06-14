@@ -46,23 +46,32 @@ module vigna_f_ext_testbench;
     always @(posedge clk) begin
         if (resetn) begin
             // Instruction memory interface
-            if (i_valid && i_ready) begin
-                i_rdata <= instruction_memory[i_addr[9:2]];
+            if (i_valid && !i_ready) begin
+                i_rdata <= instruction_memory[i_addr[11:2]];
+                i_ready <= 1;
+            end else if (!i_valid) begin
+                i_ready <= 0;
             end
             
             // Data memory interface
-            if (d_valid && d_ready) begin
+            if (d_valid && !d_ready) begin
                 if (d_wstrb != 0) begin
                     // Write operation
-                    if (d_wstrb[0]) data_memory[d_addr[9:2]][7:0]   <= d_wdata[7:0];
-                    if (d_wstrb[1]) data_memory[d_addr[9:2]][15:8]  <= d_wdata[15:8];
-                    if (d_wstrb[2]) data_memory[d_addr[9:2]][23:16] <= d_wdata[23:16];
-                    if (d_wstrb[3]) data_memory[d_addr[9:2]][31:24] <= d_wdata[31:24];
+                    if (d_wstrb[0]) data_memory[d_addr[11:2]][7:0]   <= d_wdata[7:0];
+                    if (d_wstrb[1]) data_memory[d_addr[11:2]][15:8]  <= d_wdata[15:8];
+                    if (d_wstrb[2]) data_memory[d_addr[11:2]][23:16] <= d_wdata[23:16];
+                    if (d_wstrb[3]) data_memory[d_addr[11:2]][31:24] <= d_wdata[31:24];
                 end else begin
                     // Read operation
-                    d_rdata <= data_memory[d_addr[9:2]];
+                    d_rdata <= data_memory[d_addr[11:2]];
                 end
+                d_ready <= 1;
+            end else if (!d_valid) begin
+                d_ready <= 0;
             end
+        end else begin
+            i_ready <= 0;
+            d_ready <= 0;
         end
     end
     
@@ -114,8 +123,8 @@ module vigna_f_ext_testbench;
             $display("Running test: %0s", test_name);
             cycle_count = 0;
             max_cycles = max_test_cycles;
-            i_ready = 1;
-            d_ready = 1;
+            
+            // Note: i_ready and d_ready are controlled by memory simulation
             
             // Wait for test completion or timeout
             while (cycle_count < max_cycles) begin
