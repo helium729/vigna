@@ -99,16 +99,31 @@ always @ (posedge clk) begin
             1: begin
                 if (i_ready) begin
                     `ifdef VIGNA_CORE_C_EXTENSION
-                    // Simple approach: check if lower 16 bits are compressed
-                    if (i_rdata[1:0] != 2'b11) begin
-                        // 16-bit compressed instruction
-                        inst[31:16]   <= 16'h0;
-                        inst[15:0]    <= i_rdata[15:0];
-                        inst_is_16bit <= 1;
+                    // Handle compressed instructions based on PC alignment
+                    if (i_addr[1] == 1'b0) begin
+                        // PC is at even half-word (0, 4, 8, ...) - check lower 16 bits
+                        if (i_rdata[1:0] != 2'b11) begin
+                            // 16-bit compressed instruction in lower half
+                            inst[31:16]   <= 16'h0;
+                            inst[15:0]    <= i_rdata[15:0];
+                            inst_is_16bit <= 1;
+                        end else begin
+                            // 32-bit instruction
+                            inst          <= i_rdata;
+                            inst_is_16bit <= 0;
+                        end
                     end else begin
-                        // 32-bit instruction
-                        inst          <= i_rdata;
-                        inst_is_16bit <= 0;
+                        // PC is at odd half-word (2, 6, 10, ...) - check upper 16 bits
+                        if (i_rdata[17:16] != 2'b11) begin
+                            // 16-bit compressed instruction in upper half
+                            inst[31:16]   <= 16'h0;
+                            inst[15:0]    <= i_rdata[31:16];
+                            inst_is_16bit <= 1;
+                        end else begin
+                            // This shouldn't happen for properly aligned code
+                            inst          <= i_rdata;
+                            inst_is_16bit <= 0;
+                        end
                     end
                     `else
                     inst            <= i_rdata;

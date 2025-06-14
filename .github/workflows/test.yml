@@ -13,15 +13,16 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Install Icarus Verilog
+    - name: Install Icarus Verilog and RISC-V toolchain
       run: |
         sudo apt-get update
-        sudo apt-get install -y iverilog
+        sudo apt-get install -y iverilog gcc-riscv64-linux-gnu
     
     - name: Verify tools installation
       run: |
         iverilog -V
         vvp -V
+        riscv64-linux-gnu-gcc --version
     
     - name: Run syntax checks
       run: |
@@ -46,25 +47,14 @@ jobs:
     - name: Run all configuration tests
       run: make test_all_configs
     
-    - name: Build C programs (if cross-compiler available)
-      run: |
-        if command -v riscv64-linux-gnu-gcc &> /dev/null; then
-          cd programs && make all
-        else
-          echo "RISC-V cross-compiler not available, skipping C program tests"
-        fi
-      continue-on-error: true
+    - name: Build C programs
+      run: cd programs && make all
     
-    - name: Run program tests (if C programs built)
+    - name: Run program tests
       run: |
-        if [ -d "programs/build" ] && [ "$(ls -A programs/build)" ]; then
-          make program_quick_test
-          make program_test_rv32im_zicsr
-          make program_test_rv32imc_zicsr
-        else
-          echo "C programs not built, skipping program tests"
-        fi
-      continue-on-error: true
+        make program_quick_test
+        make program_test_rv32im_zicsr
+        make program_test_rv32imc_zicsr
     
     - name: Test results summary
       run: |
