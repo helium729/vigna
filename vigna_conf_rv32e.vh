@@ -1,13 +1,14 @@
 `ifndef VIGNA_CONF_VH
 `define VIGNA_CONF_VH
 
+/* RV32E Configuration - Embedded Base (16 registers) */
 
 /* ------------------------------------------------------------------------- */
 
 /* enabling E extension
  * which disables x16-x32 support */
  
-//`define VIGNA_CORE_E_EXTENSION
+`define VIGNA_CORE_E_EXTENSION
 
 /* ------------------------------------------------------------------------- */
 
@@ -36,8 +37,6 @@
 
 /* ------------------------------------------------------------------------- */
 
-/* ------------------------------------------------------------------------- */
-
 /* shift instruction options 
  * two-stage shift: make shifts in 4 bits then 1 bit
  * none: shift one bit per cycle
@@ -57,20 +56,23 @@
 
 /*--------------------------------------------------------------------------*/
 
-`define VIGNA_CORE_M_EXTENSION
+// M extension DISABLED for embedded base
+//`define VIGNA_CORE_M_EXTENSION
 
 //ToDo
 //`define VIGNA_CORE_M_FPGA_FAST
 
-`define VIGNA_CORE_INTERRUPT
+//ToDo
+//`define VIGNA_CORE_INTERRUPT
 
-`define VIGNA_CORE_ZICSR_EXTENSION
+// ZICSR extension DISABLED for embedded base
+//`define VIGNA_CORE_ZICSR_EXTENSION
 
 /* C extension support
  * uncomment this line to enable RISC-V Compact instruction extension
  * this allows 16-bit compressed instructions to be used alongside 32-bit instructions */
- 
-`define VIGNA_CORE_C_EXTENSION
+
+//`define VIGNA_CORE_C_EXTENSION
 
 `define VIGNA_CORE_ALIGNMENT
 
@@ -78,7 +80,9 @@
 
 /* AXI-Lite bus interface option
  * uncomment this line to enable AXI4-Lite interface instead of simple interface
- * when enabled, use vigna_axi module instead of vigna module */
+ * when enabled, use vigna_axi module instead of vigna module 
+ * This does not have effect actually, so do it at your will.
+ */
 
 //`define VIGNA_AXI_LITE_INTERFACE
 
