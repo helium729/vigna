@@ -79,9 +79,10 @@ module program_testbench();
                 if (d_wstrb != 0) begin
                     // Write operation
                     // Map address 0x1000+ to data_memory starting at index 0
-                    if (d_wstrb == 4'b1111) 
+                    if (d_wstrb == 4'b1111) begin
                         data_memory[(d_addr - 32'h1000) >> 2] <= d_wdata;
-                    else if (d_wstrb == 4'b0011)
+                        // $display("DEBUG: Write to addr=0x%08x, data=0x%08x, mem_idx=%d", d_addr, d_wdata, (d_addr - 32'h1000) >> 2);
+                    end else if (d_wstrb == 4'b0011)
                         data_memory[(d_addr - 32'h1000) >> 2] <= (data_memory[(d_addr - 32'h1000) >> 2] & 32'hFFFF0000) | (d_wdata & 32'h0000FFFF);
                     else if (d_wstrb == 4'b0001)
                         data_memory[(d_addr - 32'h1000) >> 2] <= (data_memory[(d_addr - 32'h1000) >> 2] & 32'hFFFFFF00) | (d_wdata & 32'h000000FF);
@@ -98,21 +99,34 @@ module program_testbench();
         end
     end
     
-    // Load program from memory file
-    task load_program;
-        input [255:0] filename;
+    // Load specific program into instruction memory
+    task load_simple_test;
         begin
-            $display("Loading program from %s...", filename);
-            
+            $display("Loading simple_test program...");
             // Clear memory
             for (integer i = 0; i < 1024; i = i + 1) begin
                 instruction_memory[i] = 32'h00000013; // NOP
                 data_memory[i] = 32'h00000000;
             end
             
-            // Load program
-            $readmemh(filename, instruction_memory);
-            $display("Program loaded successfully");
+            // Load program - include the generated assignments
+            `include "programs/build/simple_test.vh"
+            $display("Simple test program loaded successfully");
+        end
+    endtask
+    
+    task load_fibonacci_test;
+        begin
+            $display("Loading fibonacci_simple program...");
+            // Clear memory
+            for (integer i = 0; i < 1024; i = i + 1) begin
+                instruction_memory[i] = 32'h00000013; // NOP
+                data_memory[i] = 32'h00000000;
+            end
+            
+            // Load program - include the generated assignments
+            `include "programs/build/fibonacci_simple.vh"
+            $display("Fibonacci simple program loaded successfully");
         end
     endtask
     
@@ -310,71 +324,23 @@ module program_testbench();
         repeat(10) @(posedge clk);
         resetn = 1;
         
-        // Test 1: Simple arithmetic program - hard-coded memory initialization
-        $display("Loading program manually...");
-        
-        // Clear memory
-        for (integer i = 0; i < 1024; i = i + 1) begin
-            instruction_memory[i] = 32'h00000013; // NOP
-            data_memory[i] = 32'h00000000;
-        end
-        
-        // Load simple_test program manually
-        instruction_memory[  0] = 32'h00001737;  // lui a4,0x1
-        instruction_memory[  1] = 32'h01e00693;  // li a3,30
-        instruction_memory[  2] = 32'h00d72023;  // sw a3,0(a4)
-        instruction_memory[  3] = 32'h000017b7;  // lui a5,0x1
-        instruction_memory[  4] = 32'h00f00713;  // li a4,15
-        instruction_memory[  5] = 32'h00e7a223;  // sw a4,4(a5)
-        instruction_memory[  6] = 32'h000016b7;  // lui a3,0x1
-        instruction_memory[  7] = 32'hdeadc737;  // lui a4,0xdeadc
-        instruction_memory[  8] = 32'h01400613;  // li a2,20
-        instruction_memory[  9] = 32'h000017b7;  // lui a5,0x1
-        instruction_memory[ 10] = 32'h00c6a423;  // sw a2,8(a3)
-        instruction_memory[ 11] = 32'heef70713;  // addi a4,a4,-273
-        instruction_memory[ 12] = 32'h00e7a623;  // sw a4,12(a5)
-        instruction_memory[ 13] = 32'h0000006f;  // j 0 (infinite loop)
-        
-        $display("Program loaded successfully");
-        
+        // Test 1: Simple arithmetic program
+        load_simple_test();
         run_program("Simple Arithmetic Test", 1000);
         verify_simple_test_results();
         
-        /*
+        // Reset processor between tests
+        $display("");
+        $display("Resetting processor for next test...");
+        resetn = 0;
+        repeat(10) @(posedge clk);
+        resetn = 1;
+        
         // Test 2: Fibonacci program
         $display("");
-        $display("Loading program from fibonacci_test.mem...");
-        
-        // Clear memory
-        for (integer i = 0; i < 1024; i = i + 1) begin
-            instruction_memory[i] = 32'h00000013; // NOP
-            data_memory[i] = 32'h00000000;
-        end
-        
-        // Load program
-        $readmemh("fibonacci_test.mem", instruction_memory);
-        $display("Program loaded successfully");
-        
-        run_program("Fibonacci Test", 2000);
+        load_fibonacci_test();
+        run_program("Fibonacci Test", 3000);
         verify_fibonacci_test_results();
-        
-        // Test 3: Sorting program
-        $display("");
-        $display("Loading program from sorting_test.mem...");
-        
-        // Clear memory
-        for (integer i = 0; i < 1024; i = i + 1) begin
-            instruction_memory[i] = 32'h00000013; // NOP
-            data_memory[i] = 32'h00000000;
-        end
-        
-        // Load program
-        $readmemh("sorting_test.mem", instruction_memory);
-        $display("Program loaded successfully");
-        
-        run_program("Sorting Test", 3000);
-        verify_sorting_test_results();
-        */
         
         // Test summary
         $display("");

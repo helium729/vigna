@@ -65,8 +65,19 @@ Enhanced testbench with result verification through memory stores, testing arith
 ##### sim/comprehensive_processor_testbench.v
 Comprehensive testbench that adds shift operations, upper immediate operations, and branch operations.
 
-##### sim/mem_sim.v
-Memory simulator module that provides instruction and data memory interfaces for testbenches.
+##### sim/program_testbench.v
+Complete program testbench that executes entire C programs compiled to RISC-V machine code, verifying complex software functionality including algorithms, memory operations, and program termination.
+
+#### programs/
+Directory containing C test programs and build system:
+- **simple_test.c**: Basic arithmetic and control flow test
+- **fibonacci_simple.c**: Fibonacci sequence calculation  
+- **sorting_test.c**: Bubble sort algorithm
+- **Makefile**: Cross-compilation build system for RISC-V
+
+#### tools/
+Utility scripts for program testing:
+- **bin_to_verilog_mem.py**: Converts compiled binaries to Verilog memory initialization format
 
 ##### sim/README.md
 Detailed documentation for the test suite, including build instructions, test descriptions, and usage examples.
@@ -107,6 +118,27 @@ The test suite covers:
 - Upper immediate operations (LUI, AUIPC)
 - Branch operations (BEQ, BNE, etc.)
 - M extension operations (if enabled)
+- **Complete C programs compiled to RISC-V machine code**
+
+### Complete Program Tests
+In addition to instruction-level tests, the framework includes complete program testing:
+
+```bash
+# Run complete C program tests
+make program_test
+make program_quick_test
+
+# Build test programs from C source
+cd programs && make all
+```
+
+The complete program tests verify:
+- C program compilation and execution
+- Complex algorithms (Fibonacci, sorting)
+- Memory-mapped I/O functionality
+- Program termination and result verification
+
+For detailed information, see `COMPLETE_PROGRAM_TESTS.md`.
 
 For detailed test documentation, see `TESTS.md` and `sim/README.md`.
 

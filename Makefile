@@ -69,7 +69,7 @@ comprehensive_test: $(COMPREHENSIVE_VVP_FILE)
 
 # Run program simulation
 program_test: $(PROGRAM_VVP_FILE)
-	cd $(SIM_DIR) && $(VVP) $(PROGRAM_TESTBENCH).vvp
+	cd $(SIM_DIR) && cp ../programs/build/*.mem . && $(VVP) $(PROGRAM_TESTBENCH).vvp
 
 # Run AXI simulation
 axi_test: $(AXI_VVP_FILE)
@@ -129,6 +129,7 @@ comprehensive_quick_test:
 
 program_quick_test:
 	$(IVERILOG) -o /tmp/program_test.vvp -I. $(CORE_SOURCES) $(SIM_DIR)/$(PROGRAM_TESTBENCH).v
+	cp programs/build/*.mem /tmp/
 	$(VVP) /tmp/program_test.vvp
 	rm -f /tmp/program_test.vvp
 

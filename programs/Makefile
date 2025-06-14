@@ -14,14 +14,15 @@ BUILD_DIR = build
 TOOLS_DIR = ../tools
 
 # Programs
-PROGRAMS = simple_test fibonacci_test sorting_test
+PROGRAMS = simple_test fibonacci_simple sorting_test
 ELFS = $(addprefix $(BUILD_DIR)/, $(addsuffix .elf, $(PROGRAMS)))
 BINS = $(addprefix $(BUILD_DIR)/, $(addsuffix .bin, $(PROGRAMS)))
 MEMFILES = $(addprefix $(BUILD_DIR)/, $(addsuffix .mem, $(PROGRAMS)))
+VFILES = $(addprefix $(BUILD_DIR)/, $(addsuffix .vh, $(PROGRAMS)))
 
 .PHONY: all clean disasm
 
-all: $(BUILD_DIR) $(ELFS) $(BINS) $(MEMFILES)
+all: $(BUILD_DIR) $(ELFS) $(BINS) $(MEMFILES) $(VFILES)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -37,6 +38,10 @@ $(BUILD_DIR)/%.bin: $(BUILD_DIR)/%.elf
 # Convert binary to Verilog memory format
 $(BUILD_DIR)/%.mem: $(BUILD_DIR)/%.bin
 	python3 $(TOOLS_DIR)/bin_to_verilog_mem.py $< $@
+
+# Convert binary to Verilog include format  
+$(BUILD_DIR)/%.vh: $(BUILD_DIR)/%.bin
+	python3 $(TOOLS_DIR)/bin_to_verilog_mem.py --format assignments $< $@
 
 # Generate disassembly for debugging
 disasm: $(ELFS)
