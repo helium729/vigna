@@ -680,7 +680,8 @@ always @ (posedge clk) begin
                 csr_regs[CSR_MCAUSE] <= 32'h80000000 | 32'd3;  // Software interrupt
                 interrupt_cause <= mtvec; // Jump to trap handler
             end
-        end else begin
+        end else if (interrupt_taken && fetch_received) begin
+            // Reset interrupt_taken after PC has been updated
             interrupt_taken <= 0;
         end
         `endif
@@ -920,6 +921,9 @@ assign fetch_received = (exec_state == 4'b0000 && !is_jump && !is_branch)
                         || (exec_state == 4'b1000)
                         `ifdef VIGNA_CORE_ZICSR_EXTENSION
                         || (exec_state == 4'b1010)
+                        `endif
+                        `ifdef VIGNA_CORE_INTERRUPT
+                        || interrupt_taken
                         `endif
                         ;
 
