@@ -208,16 +208,12 @@ always @(posedge clk) begin
             end
             D_WRITE_ADDR: begin
                 if (d_awready && d_wready) begin
+                    // Both address and data channels are ready, proceed to response state
                     d_awvalid <= 1'b0;
                     d_wvalid <= 1'b0;
                     d_state <= D_WRITE_RESP;
-                end else if (d_awready) begin
-                    d_awvalid <= 1'b0;
-                    d_state <= D_WRITE_DATA;
-                end else if (d_wready) begin
-                    d_wvalid <= 1'b0;
-                    d_state <= D_WRITE_DATA;
                 end
+                // Wait for both d_awready and d_wready to be asserted
             end
             D_WRITE_DATA: begin
                 if (d_awready && d_awvalid) begin
