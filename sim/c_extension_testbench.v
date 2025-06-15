@@ -153,7 +153,8 @@ module c_extension_testbench;
             $display("Setting up C extension test...");
             
             // Pack two C instructions: C.LI x1, 42 (lower) + C.ADDI x1, 0 (upper, NOP)
-            instruction_memory[0] = 32'h008150a9;
+            // Pack two C instructions: C.LI x1, 42 (lower) + C.ADDI x1, 0 (upper, NOP)
+            instruction_memory[0] = {C_ADDI_X1_NOP, C_LI_X1_42};
             
             // Store result - SW x1, 0(x0) (regular 32-bit instruction at next word)
             instruction_memory[1] = {12'd0, 5'd1, 3'b010, 5'd0, 7'b0100011};
