@@ -147,16 +147,16 @@ module c_extension_testbench;
         end
     endtask
 
-    // Test basic instructions (simplified debug version)
+    // Test basic C extension instructions
     task test_c_basic;
         begin
-            $display("Setting up simplified test...");
+            $display("Setting up C extension test...");
             
-            // Just load a simple value and store it
-            // ADDI x1, x0, 42
-            instruction_memory[0] = {12'd42, 5'd0, 3'b000, 5'd1, 7'b0010011};
+            // Pack two C instructions: C.LI x1, 42 (lower) + C.ADDI x1, 0 (upper, NOP)
+            // Pack two C instructions: C.LI x1, 42 (lower) + C.ADDI x1, 0 (upper, NOP)
+            instruction_memory[0] = {C_ADDI_X1_NOP, C_LI_X1_42};
             
-            // Store result - SW x1, 0(x0) 
+            // Store result - SW x1, 0(x0) (regular 32-bit instruction at next word)
             instruction_memory[1] = {12'd0, 5'd1, 3'b010, 5'd0, 7'b0100011};
             
             // Infinite loop to halt
