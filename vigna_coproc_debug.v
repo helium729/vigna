@@ -182,64 +182,125 @@ module vigna_f_ext(
         if (!resetn) begin
             fp_result <= 32'h0;
             state     <= 3'h0;
-            ready     <= 1'b0;  // Start NOT ready
+            ready     <= 1'b1;
         end else begin
             case (state)
                 0: begin
                     if (valid) begin
-                        state <= 1;  // Go to computation state
+                        ready <= 1'b0;
+                        state <= 1;
                         
-                        $display("    [COPROC] Valid operation: func=%b, func2=%b", func, func2);
-                        $display("    [COPROC] Flags: is_fadd=%b, is_fsub=%b", is_fadd, is_fsub);
-                        
-                        // Compute result immediately for simple operations
+                        // Simple FP operations (not fully IEEE 754 compliant)
                         if (is_fmv_w_x) begin
+                            // Move integer to FP register (bit copy)
                             fp_result <= op1;
                         end else if (is_fmv_x_w) begin
+                            // Move FP to integer register (bit copy)
                             fp_result <= op1;
                         end else if (is_fcvt_s_w) begin
+                            // Convert signed integer to float (simplified)
+                            // This is a simplified conversion - not full IEEE 754
                             if (op1 == 32'h0) begin
-                                fp_result <= 32'h0;
+                                fp_result <= 32'h0;  // +0.0
                             end else if (op1[31]) begin
+                                // Negative number - simplified conversion
                                 fp_result <= {1'b1, 8'h80 + 8'd22, op1[22:0]};
                             end else begin
+                                // Positive number - simplified conversion  
                                 fp_result <= {1'b0, 8'h80 + 8'd22, op1[22:0]};
                             end
                         end else if (is_fcvt_w_s) begin
+                            // Convert float to signed integer (simplified)
                             if (exp1 == 8'h0) begin
-                                fp_result <= 32'h0;
+                                fp_result <= 32'h0;  // Zero or denormal -> 0
                             end else if (exp1 >= 8'h9E) begin
+                                // Large number - saturate
                                 fp_result <= sign1 ? 32'h80000000 : 32'h7FFFFFFF;
                             end else begin
+                                // Simplified conversion - extract integer part
                                 fp_result <= sign1 ? {1'b1, mant1[22:0], 8'h0} : {1'b0, mant1[22:0], 8'h0};
                             end
-                        end else if (is_fadd) begin
-                            $display("    [COPROC] FADD operation: %08x + %08x", op1, op2);
-                            fp_result <= 32'h40400000;  // 1.0 + 2.0 = 3.0 (for now)
-                            $display("    [COPROC] FADD result: %08x", 32'h40400000);
-                        end else if (is_fsub) begin
-                            $display("    [COPROC] FSUB operation: %08x - %08x", op1, op2);
-                            fp_result <= 32'h3F800000;  // 2.0 - 1.0 = 1.0 (for now)
-                            $display("    [COPROC] FSUB result: %08x", 32'h3F800000);
+                        end else if (is_fadd || is_fsub) begin
+                            $display("    [COPROC] FADD/FSUB operation detected: is_fadd=%b, is_fsub=%b", is_fadd, is_fsub);
+                            $display("    [COPROC] Input: fp1=%08x, fp2=%08x", fp1, fp2);
+                            $display("    [COPROC] Extracted: sign1=%b, exp1=%02x, mant1=%06x", sign1, exp1, mant1);
+                            $display("    [COPROC] Extracted: sign2=%b, exp2=%02x, mant2=%06x", sign2, exp2, mant2);
+                            
+                            // Simplified IEEE 754 single precision add/subtract
+                            // Handle special cases first
+                            if (fp1 == 32'h0 && fp2 == 32'h0) begin
+                                fp_result <= 32'h0;  // 0 + 0 = 0
+                                $display("    [COPROC] Case: Both zero -> 0");
+                            end else if (fp1 == 32'h0) begin
+                                fp_result <= is_fsub ? (fp2 ^ 32'h80000000) : fp2;  // 0 + x = x, 0 - x = -x
+                                $display("    [COPROC] Case: fp1 zero -> result=%08x", is_fsub ? (fp2 ^ 32'h80000000) : fp2);
+                            end else if (fp2 == 32'h0) begin
+                                fp_result <= fp1;  // x + 0 = x, x - 0 = x
+                                $display("    [COPROC] Case: fp2 zero -> result=%08x", fp1);
+                            end else if (exp1 == exp2) begin
+                                $display("    [COPROC] Case: Same exponent");
+                                // Same exponent - simplified arithmetic
+                                if (is_fsub && (sign1 != sign2)) begin
+                                    // Different signs for subtraction = addition
+                                    fp_result <= {sign1, exp1, (mant1 + mant2)};
+                                    $display("    [COPROC] FSUB diff signs -> ADD: result=%08x", {sign1, exp1, (mant1 + mant2)});
+                                end else if (is_fadd && (sign1 == sign2)) begin
+                                    // Same signs for addition
+                                    fp_result <= {sign1, exp1, (mant1 + mant2)};
+                                    $display("    [COPROC] FADD same signs: result=%08x", {sign1, exp1, (mant1 + mant2)});
+                                end else begin
+                                    // Subtraction of same signs or addition of different signs
+                                    if (mant1 >= mant2) begin
+                                        fp_result <= {sign1, exp1, (mant1 - mant2)};
+                                        $display("    [COPROC] SUB case 1: result=%08x", {sign1, exp1, (mant1 - mant2)});
+                                    end else begin
+                                        fp_result <= {sign2, exp1, (mant2 - mant1)};
+                                        $display("    [COPROC] SUB case 2: result=%08x", {sign2, exp1, (mant2 - mant1)});
+                                    end
+                                end
+                            end else begin
+                                $display("    [COPROC] Case: Different exponent");
+                                // Different exponents - return the operand with larger magnitude
+                                if (exp1 > exp2) begin
+                                    fp_result <= fp1;
+                                    $display("    [COPROC] exp1 > exp2 -> result=%08x", fp1);
+                                end else begin
+                                    fp_result <= is_fsub ? (fp2 ^ 32'h80000000) : fp2;
+                                    $display("    [COPROC] exp2 >= exp1 -> result=%08x", is_fsub ? (fp2 ^ 32'h80000000) : fp2);
+                                end
+                            end
                         end else begin
+                                    // Subtraction of same signs or addition of different signs
+                                    if (mant1 >= mant2) begin
+                                        fp_result <= {sign1, exp1, (mant1 - mant2)};
+                                    end else begin
+                                        fp_result <= {sign2, exp1, (mant2 - mant1)};
+                                    end
+                                end
+                            end else begin
+                                // Different exponents - return the operand with larger magnitude
+                                if (exp1 > exp2) begin
+                                    fp_result <= fp1;
+                                end else begin
+                                    fp_result <= is_fsub ? (fp2 ^ 32'h80000000) : fp2;
+                                end
+                            end
+                        end else begin
+                            // For other arithmetic operations, use simplified logic
                             fp_result <= 32'h3F800000; // Default to 1.0f
                         end
+                    end else begin
+                        ready <= 1'b1;
                     end
                 end
                 1: begin
-                    // Operation complete - signal ready and go to wait state
-                    state <= 2;
+                    // Complete operation
                     ready <= 1'b1;
-                    $display("    [COPROC] Operation complete, result=%08x", fp_result);
-                end
-                2: begin
-                    // Wait state - reset ready and go back to idle
-                    ready <= 1'b0;
                     state <= 0;
                 end
                 default: begin
                     state <= 0;
-                    ready <= 1'b0;
+                    ready <= 1'b1;
                 end
             endcase
         end

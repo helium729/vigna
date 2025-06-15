@@ -465,9 +465,6 @@ assign frs2_val = fp_regs[frs2];
 
 // Floating point CSR (FCSR) - basic implementation
 reg [31:0] fcsr;
-
-// FP operation destination register (latched)
-reg [4:0] fp_dest_reg;
 `endif
 
 `ifdef VIGNA_CORE_ZICSR_EXTENSION
@@ -732,7 +729,6 @@ always @ (posedge clk) begin
         f_valid <= 0;
         is_fp_load <= 0;
         fp_wb_reg <= 0;
-        fp_dest_reg <= 0;
         `endif
         
         shift_cnt <= 0;
@@ -812,7 +808,7 @@ always @ (posedge clk) begin
                         d1 <= frs1_val;
                         d2 <= frs2_val;
                         f_valid <= 1;
-                        fp_dest_reg <= frd;  // Latch the destination register
+                        $display("    [CORE] Starting FP op: funct3=%b, funct7=%b, d1=%08x, d2=%08x", funct3, funct7, frs1_val, frs2_val);
                     end else if (is_flw) begin
                         // FP load: d1 and d2 are already set correctly, just set flags
                         is_fp_load <= 1;
@@ -1045,7 +1041,8 @@ always @ (posedge clk) begin
                 // Floating point operation completion
                 f_valid <= 0;
                 if (f_ready) begin
-                    fp_regs[fp_dest_reg] <= f_result;  // Write result to latched FP register
+                    $display("    [CORE] FP operation complete: f_result=%08x, frd=%d", f_result, frd);
+                    fp_regs[frd] <= f_result;  // Write result to FP register
                     exec_state <= 0;
                 end
             end
