@@ -12,4 +12,4 @@ obj_dir/
 *.hex
 isa_test/*.py
 *.vvp
-*.vcd
+*.vcdtools/__pycache__/
