@@ -264,105 +264,138 @@ module vigna_f_ext(
 
 endmodule
 
-// Simple IEEE 754 single precision floating point adder
+// Improved IEEE 754 single precision floating point adder
 module fp_add_simple(
     input [31:0] a,
     input [31:0] b,
     output [31:0] result
 );
 
-    // Handle special cases and basic arithmetic
-    assign result = fp_add_sub_logic(a, b, 1'b0);
+    // Extract IEEE 754 components
+    wire sign_a = a[31];
+    wire [7:0] exp_a = a[30:23];
+    wire [22:0] mant_a = a[22:0];
     
-    function [31:0] fp_add_sub_logic;
+    wire sign_b = b[31];
+    wire [7:0] exp_b = b[30:23];
+    wire [22:0] mant_b = b[22:0];
+    
+    // Check for zero operands
+    wire is_zero_a = (exp_a == 8'd0) && (mant_a == 23'd0);
+    wire is_zero_b = (exp_b == 8'd0) && (mant_b == 23'd0);
+    
+    assign result = fp_add_logic(a, b);
+    
+    function [31:0] fp_add_logic;
         input [31:0] a, b;
-        input subtract;
         
-        reg [31:0] op_b;
-        reg [31:0] val_a, val_b, val_result;
-        reg sign_result;
+        // Extract components
+        reg sign_a, sign_b, result_sign;
+        reg [7:0] exp_a, exp_b, result_exp;
+        reg [22:0] mant_a, mant_b;
+        reg [24:0] mant_a_ext, mant_b_ext, result_mant;
+        reg [7:0] exp_diff;
         
         begin
-            // For subtraction, flip the sign of b
-            op_b = subtract ? {~b[31], b[30:0]} : b;
+            sign_a = a[31];
+            exp_a = a[30:23];
+            mant_a = a[22:0];
+            
+            sign_b = b[31];
+            exp_b = b[30:23];
+            mant_b = b[22:0];
             
             // Handle zero cases
-            if (a[30:0] == 0 && op_b[30:0] == 0) begin
-                fp_add_sub_logic = 32'h0;
-            end else if (a[30:0] == 0) begin
-                fp_add_sub_logic = op_b;
-            end else if (op_b[30:0] == 0) begin
-                fp_add_sub_logic = a;
+            if ((exp_a == 0 && mant_a == 0) && (exp_b == 0 && mant_b == 0)) begin
+                fp_add_logic = 32'h0;  // 0 + 0 = 0
+            end else if (exp_a == 0 && mant_a == 0) begin
+                fp_add_logic = b;  // 0 + b = b
+            end else if (exp_b == 0 && mant_b == 0) begin
+                fp_add_logic = a;  // a + 0 = a
             end else begin
-                // Both operands non-zero
-                // Convert to integer approximation for basic arithmetic
-                val_a = ieee_to_int(a);
-                val_b = ieee_to_int(op_b);
+                // Both operands are non-zero
+                // Add implicit leading 1 for normalized numbers (mantissa becomes 1.fraction)
+                mant_a_ext = {2'b01, mant_a};  // 1 + 23 fraction bits = 24 bits, extended to 25
+                mant_b_ext = {2'b01, mant_b};  // 1 + 23 fraction bits = 24 bits, extended to 25
                 
-                if (a[31] == op_b[31]) begin
-                    // Same signs - add
-                    val_result = val_a + val_b;
-                    sign_result = a[31];
-                end else begin
-                    // Different signs - subtract
-                    if (val_a >= val_b) begin
-                        val_result = val_a - val_b;
-                        sign_result = a[31];
+                // Align exponents
+                if (exp_a > exp_b) begin
+                    exp_diff = exp_a - exp_b;
+                    result_exp = exp_a;
+                    
+                    // Shift smaller mantissa right
+                    if (exp_diff < 25) begin
+                        mant_b_ext = mant_b_ext >> exp_diff;
                     end else begin
-                        val_result = val_b - val_a;
-                        sign_result = op_b[31];
+                        mant_b_ext = 0;
+                    end
+                end else if (exp_b > exp_a) begin
+                    exp_diff = exp_b - exp_a;
+                    result_exp = exp_b;
+                    
+                    // Shift smaller mantissa right
+                    if (exp_diff < 25) begin
+                        mant_a_ext = mant_a_ext >> exp_diff;
+                    end else begin
+                        mant_a_ext = 0;
+                    end
+                end else begin
+                    // Equal exponents
+                    result_exp = exp_a;
+                end
+                
+                // Perform addition or subtraction based on signs
+                if (sign_a == sign_b) begin
+                    // Same signs - add mantissas
+                    result_mant = mant_a_ext + mant_b_ext;
+                    result_sign = sign_a;
+                    
+                    // Check for mantissa overflow
+                    if (result_mant[24]) begin
+                        // Overflow - normalize by shifting right and incrementing exponent
+                        result_mant = result_mant >> 1;
+                        result_exp = result_exp + 1;
+                    end
+                end else begin
+                    // Different signs - subtract mantissas
+                    if (mant_a_ext >= mant_b_ext) begin
+                        result_mant = mant_a_ext - mant_b_ext;
+                        result_sign = sign_a;
+                    end else begin
+                        result_mant = mant_b_ext - mant_a_ext;
+                        result_sign = sign_b;
+                    end
+                    
+                    // Normalize - shift left until MSB is in bit 23
+                    if (result_mant == 0) begin
+                        fp_add_logic = 32'h0;  // Result is zero
+                    end else begin
+                        while (result_mant[23] == 0 && result_exp > 0) begin
+                            result_mant = result_mant << 1;
+                            result_exp = result_exp - 1;
+                        end
                     end
                 end
                 
-                // Convert back to IEEE 754
-                fp_add_sub_logic = int_to_ieee(val_result, sign_result);
-            end
-        end
-    endfunction
-    
-    // Simplified conversion functions
-    function [31:0] ieee_to_int;
-        input [31:0] ieee;
-        begin
-            if (ieee[30:0] == 0) begin
-                ieee_to_int = 0;
-            end else begin
-                // Basic cases
-                if (ieee == 32'h3F800000) ieee_to_int = 1000;      // 1.0 -> 1000
-                else if (ieee == 32'h40000000) ieee_to_int = 2000; // 2.0 -> 2000  
-                else if (ieee == 32'h40400000) ieee_to_int = 3000; // 3.0 -> 3000
-                else if (ieee == 32'h40800000) ieee_to_int = 4000; // 4.0 -> 4000
-                else if (ieee == 32'h40A00000) ieee_to_int = 5000; // 5.0 -> 5000
-                else if (ieee == 32'hBF800000) ieee_to_int = 1000; // -1.0 -> 1000 (abs)
-                else if (ieee == 32'hC0000000) ieee_to_int = 2000; // -2.0 -> 2000 (abs)
-                else ieee_to_int = 1000; // Default
-            end
-        end
-    endfunction
-    
-    function [31:0] int_to_ieee;
-        input [31:0] int_val;
-        input sign;
-        begin
-            if (int_val == 0) begin
-                int_to_ieee = 32'h0;
-            end else begin
-                // Convert back to IEEE 754 - hardcoded for known values
-                if (int_val == 1000) int_to_ieee = sign ? 32'hBF800000 : 32'h3F800000; // ±1.0
-                else if (int_val == 2000) int_to_ieee = sign ? 32'hC0000000 : 32'h40000000; // ±2.0
-                else if (int_val == 3000) int_to_ieee = sign ? 32'hC0400000 : 32'h40400000; // ±3.0
-                else if (int_val == 4000) int_to_ieee = sign ? 32'hC0800000 : 32'h40800000; // ±4.0
-                else if (int_val == 5000) int_to_ieee = sign ? 32'hC0A00000 : 32'h40A00000; // ±5.0
-                else if (int_val == 6000) int_to_ieee = sign ? 32'hC0C00000 : 32'h40C00000; // ±6.0
-                else if (int_val == 7000) int_to_ieee = sign ? 32'hC0E00000 : 32'h40E00000; // ±7.0
-                else int_to_ieee = sign ? 32'hBF800000 : 32'h3F800000; // Default to ±1.0
+                // Check for underflow/overflow
+                if (result_exp == 0) begin
+                    fp_add_logic = 32'h0;  // Underflow to zero
+                end else if (result_exp >= 255) begin
+                    // Overflow to infinity
+                    fp_add_logic = {result_sign, 8'hFF, 23'h0};
+                end else if (result_mant != 0) begin
+                    // Normal result - remove implicit leading 1
+                    fp_add_logic = {result_sign, result_exp, result_mant[22:0]};
+                end else begin
+                    fp_add_logic = 32'h0;  // Zero result
+                end
             end
         end
     endfunction
 
 endmodule
 
-// Simple IEEE 754 single precision floating point subtractor  
+// IEEE 754 single precision floating point subtractor  
 module fp_sub_simple(
     input [31:0] a,
     input [31:0] b,
@@ -370,9 +403,11 @@ module fp_sub_simple(
 );
 
     // Subtraction is addition with flipped sign of second operand
+    wire [31:0] neg_b = {~b[31], b[30:0]};
+    
     fp_add_simple sub_as_add(
         .a(a),
-        .b({~b[31], b[30:0]}),  // Flip sign of b
+        .b(neg_b),  // Flip sign of b
         .result(result)
     );
 
