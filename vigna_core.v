@@ -120,7 +120,12 @@ always @ (posedge clk) begin
                             inst[15:0]    <= i_rdata[31:16];
                             inst_is_16bit <= 1;
                         end else begin
-                            // This shouldn't happen - 32-bit instruction at odd boundary
+                            // This shouldn't happen - 32-bit instruction at odd boundary.
+                            // Misaligned fetch cases are rare and typically indicate an issue with the instruction stream.
+                            // Using a NOP (32'h00000013) ensures safe continuation of execution without undefined behavior.
+                            `ifdef SIMULATION
+                            $display("Warning: Misaligned fetch case detected at PC=%h. Using NOP.", pc);
+                            `endif
                             inst          <= 32'h00000013; // NOP
                             inst_is_16bit <= 0;
                         end
