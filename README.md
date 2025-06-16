@@ -56,6 +56,26 @@ make comprehensive_quick_test
 ```
 
 ### 3. Configure the Core
+
+**Easy Configuration with GUI:**
+```bash
+# Launch the configuration generator GUI
+python3 tools/vigna_config_generator.py --gui
+```
+
+**Command Line Configuration:**
+```bash
+# List available predefined configurations
+python3 tools/vigna_config_generator.py --list
+
+# Generate RV32IMC configuration
+python3 tools/vigna_config_generator.py --config rv32imc --output vigna_conf.vh
+
+# Custom configuration with specific options
+python3 tools/vigna_config_generator.py --config rv32i --enable-m-extension --enable-c-extension --output my_config.vh
+```
+
+**Manual Configuration:**
 Edit `vigna_conf.vh` to enable/disable extensions:
 ```verilog
 // Enable multiply/divide extension
@@ -80,7 +100,55 @@ vigna/
 │   └── testing/             # Test guides and references
 ├── sim/                     # 🧪 Test suite and testbenches
 ├── programs/                # 📝 C test programs
-└── tools/                   # 🛠️ Utility scripts
+├── tools/                   # 🛠️ Utility scripts
+│   ├── vigna_config_generator.py # Core configuration generator (CLI + GUI)
+│   └── bin_to_verilog_mem.py     # Binary to Verilog memory converter
+```
+
+## Configuration Generator
+
+The VIGNA processor includes a unified configuration generator that supports both CLI and GUI interfaces for creating custom processor configurations.
+
+### Available Configurations
+
+| Configuration | Extensions | Description |
+|---------------|------------|-------------|
+| `rv32i` | Base | Minimal RISC-V base configuration |
+| `rv32e` | E | Embedded configuration with 16 registers |
+| `rv32im` | I + M | Base + Multiply/Divide extension |
+| `rv32ic` | I + C | Base + Compressed instruction extension |
+| `rv32imc` | I + M + C | Base + Multiply/Divide + Compressed instructions |
+| `rv32im_zicsr` | I + M + Zicsr | Base + Multiply/Divide + CSR extension |
+| `rv32imc_zicsr` | I + M + C + Zicsr | Full featured configuration |
+
+### Supported Features
+
+- **RISC-V Extensions**: M (multiply/divide), C (compressed), E (embedded), Zicsr (CSR)
+- **Performance Options**: Two-stage shift, preload negative, alignment checks
+- **Memory Configuration**: Reset addresses, stack pointer initialization
+- **Bus Architecture**: Unified vs separate instruction/data buses, AXI4-Lite support
+- **Interrupt Support**: Machine-level interrupts with CSR integration
+
+### Usage Examples
+
+```bash
+# GUI interface
+python3 tools/vigna_config_generator.py --gui
+
+# List all predefined configurations
+python3 tools/vigna_config_generator.py --list
+
+# Generate a predefined configuration
+python3 tools/vigna_config_generator.py --config rv32imc --output vigna_conf.vh
+
+# Parse existing configuration and modify
+python3 tools/vigna_config_generator.py --parse vigna_conf_rv32i.vh --enable-m-extension --output custom.vh
+
+# Custom configuration with validation
+python3 tools/vigna_config_generator.py --enable-m-extension --enable-c-extension --validate
+
+# Generate with custom reset address
+python3 tools/vigna_config_generator.py --config rv32i --reset-addr "32'h1000_0000" --output boot_config.vh
 ```
 
 ## Documentation
@@ -114,6 +182,13 @@ vigna_core cpu (
 ```
 
 ## Development Tools
+
+**Core Configuration Generator**: `tools/vigna_config_generator.py`
+- **GUI Interface**: Cross-platform configuration with tkinter
+- **CLI Interface**: Scriptable configuration generation
+- **Predefined Configs**: rv32i, rv32e, rv32im, rv32ic, rv32imc, rv32im_zicsr, rv32imc_zicsr
+- **Custom Configs**: Fine-grained control over all processor features
+- **Validation**: Automatic dependency checking and conflict resolution
 
 **RISC-V Toolchain**: Get tools from [riscv.org](https://riscv.org/software-status/)
 - GCC cross-compiler for RV32I
