@@ -443,10 +443,6 @@ reg [31:0] csr_regs[4095:0];  // Full CSR address space
 wire [11:0] csr_addr;
 assign csr_addr = imm[11:0];  // CSR address is in immediate field
 
-// CSR read value
-wire [31:0] csr_rval;
-assign csr_rval = csr_regs[csr_addr];
-
 `ifdef VIGNA_CORE_INTERRUPT
 // Machine-level interrupt CSR addresses (RISC-V standard)
 localparam [11:0] CSR_MSTATUS  = 12'h300;  // Machine status
@@ -461,19 +457,50 @@ localparam [11:0] CSR_MIP      = 12'h344;  // Machine interrupt pending
 // Interrupt control signals
 reg interrupt_taken;
 reg [31:0] interrupt_cause;
+
+// Dedicated registers for interrupt CSRs
+reg [31:0] mstatus_r;
+reg [31:0] mie_r;
+reg [31:0] mtvec_r;
+reg [31:0] mscratch_r;
+reg [31:0] mepc_r;
+reg [31:0] mcause_r;
+reg [31:0] mtval_r;
+
+// MIP is a mix of hardwired bits and software writable bits (simplified here as read-only reflecting inputs)
+wire [31:0] mip_w;
+assign mip_w = {20'b0, ext_irq, 3'b0, timer_irq, 3'b0, soft_irq, 3'b0};
+
 wire [31:0] mstatus, mie, mip, mtvec, mepc, mcause, mtval, mscratch;
-assign mstatus  = csr_regs[CSR_MSTATUS];
-assign mie      = csr_regs[CSR_MIE];
-assign mip      = csr_regs[CSR_MIP];
-assign mtvec    = csr_regs[CSR_MTVEC];
-assign mepc     = csr_regs[CSR_MEPC];
-assign mcause   = csr_regs[CSR_MCAUSE];
-assign mtval    = csr_regs[CSR_MTVAL];
-assign mscratch = csr_regs[CSR_MSCRATCH];
+assign mstatus  = mstatus_r;
+assign mie      = mie_r;
+assign mip      = mip_w;
+assign mtvec    = mtvec_r;
+assign mepc     = mepc_r;
+assign mcause   = mcause_r;
+assign mtval    = mtval_r;
+assign mscratch = mscratch_r;
 
 // Interrupt pending bits (updated by hardware)
 wire [2:0] irq_pending;
 assign irq_pending = {ext_irq, timer_irq, soft_irq};
+`endif
+
+// CSR read value
+wire [31:0] csr_rval;
+`ifdef VIGNA_CORE_INTERRUPT
+assign csr_rval = (csr_addr == CSR_MSTATUS) ? mstatus :
+                  (csr_addr == CSR_MIE)     ? mie :
+                  (csr_addr == CSR_MTVEC)   ? mtvec :
+                  (csr_addr == CSR_MSCRATCH)? mscratch :
+                  (csr_addr == CSR_MEPC)    ? mepc :
+                  (csr_addr == CSR_MCAUSE)  ? mcause :
+                  (csr_addr == CSR_MTVAL)   ? mtval :
+                  (csr_addr == CSR_MIP)     ? mip :
+                  csr_regs[csr_addr];
+`else
+assign csr_rval = csr_regs[csr_addr];
+`endif
 
 // Global interrupt enable from mstatus.MIE (bit 3)
 wire global_irq_enable;
@@ -488,7 +515,6 @@ assign soft_irq_ready  = irq_pending[0] & mie[3]  & global_irq_enable; // MSI
 // Interrupt request (prioritized: external > timer > software)
 wire interrupt_request;
 assign interrupt_request = ext_irq_ready | timer_irq_ready | soft_irq_ready;
-`endif
 `endif
 
 wire [31:0] op1, op2;
@@ -645,11 +671,14 @@ always @ (posedge clk) begin
             csr_regs[i] <= 32'h00000000;
         end
         `ifdef VIGNA_CORE_INTERRUPT
-        // Initialize interrupt-specific CSRs with minimal changes
-        // Keep mstatus at 0 for compatibility with existing tests
-        csr_regs[CSR_MIE]     <= 32'h00000000; // All interrupts disabled
-        csr_regs[CSR_MIP]     <= 32'h00000000; // No pending interrupts
-        csr_regs[CSR_MTVEC]   <= 32'h00000000; // Trap vector at address 0
+        // Initialize interrupt-specific CSRs
+        mstatus_r   <= 32'h00000000;
+        mie_r       <= 32'h00000000;
+        mtvec_r     <= 32'h00000000;
+        mscratch_r  <= 32'h00000000;
+        mepc_r      <= 32'h00000000;
+        mcause_r    <= 32'h00000000;
+        mtval_r     <= 32'h00000000;
         `endif
         `endif
         ex_branch      <= 0;
@@ -676,31 +705,29 @@ always @ (posedge clk) begin
         `endif
     end else begin
         `ifdef VIGNA_CORE_INTERRUPT
-        // Update interrupt pending register based on external signals
-        csr_regs[CSR_MIP][11] <= ext_irq;    // MEI - Machine External Interrupt
-        csr_regs[CSR_MIP][7]  <= timer_irq;  // MTI - Machine Timer Interrupt  
-        csr_regs[CSR_MIP][3]  <= soft_irq;   // MSI - Machine Software Interrupt
+        // MIP is wire-driven, no need to update reg.
         
         // Check for interrupt request during instruction fetch
         if (exec_state == 4'b0000 && fetched && interrupt_request && !interrupt_taken) begin
             // Take interrupt: save state and jump to handler
             interrupt_taken <= 1;
-            csr_regs[CSR_MEPC] <= pc; // Save current PC
-            csr_regs[CSR_MSTATUS][7] <= mstatus[3]; // Save current MIE to MPIE
-            csr_regs[CSR_MSTATUS][3] <= 0; // Disable interrupts (clear MIE)
+            mepc_r <= pc; // Save current PC
+
+            // Update mstatus: Clear MIE (bit 3), set MPIE (bit 7) to old MIE
+            mstatus_r <= (mstatus & ~32'h00000088) | ((mstatus & 32'h00000008) << 4);
             
             // Determine interrupt cause and set mcause
             if (ext_irq_ready) begin
-                csr_regs[CSR_MCAUSE] <= 32'h80000000 | 32'd11; // External interrupt
+                mcause_r <= 32'h80000000 | 32'd11; // External interrupt
                 interrupt_cause <= mtvec; // Jump to trap handler
             end else if (timer_irq_ready) begin
-                csr_regs[CSR_MCAUSE] <= 32'h80000000 | 32'd7;  // Timer interrupt
+                mcause_r <= 32'h80000000 | 32'd7;  // Timer interrupt
                 interrupt_cause <= mtvec; // Jump to trap handler
             end else if (soft_irq_ready) begin
-                csr_regs[CSR_MCAUSE] <= 32'h80000000 | 32'd3;  // Software interrupt
+                mcause_r <= 32'h80000000 | 32'd3;  // Software interrupt
                 interrupt_cause <= mtvec; // Jump to trap handler
             end
-        end else if (interrupt_taken && fetch_received) begin
+        end else if (interrupt_taken && fetched) begin
             // Reset interrupt_taken after PC has been updated
             interrupt_taken <= 0;
         end
@@ -895,9 +922,7 @@ always @ (posedge clk) begin
                 `ifdef VIGNA_CORE_INTERRUPT
                 if (is_mret) begin
                     // Machine return: restore PC and interrupt enable
-                    // This will be handled in pc_next logic
-                    csr_regs[CSR_MSTATUS][3] <= mstatus[7]; // Restore MIE from MPIE
-                    csr_regs[CSR_MSTATUS][7] <= 1; // Set MPIE to 1
+                    mstatus_r <= (mstatus & ~32'h00000088) | ((mstatus & 32'h00000080) >> 4) | 32'h00000080;
                     ex_jump <= 1; // Jump to MEPC
                 end else begin
                 `endif
@@ -906,19 +931,52 @@ always @ (posedge clk) begin
                     end
                     // Update CSR based on operation type
                     if (is_csrrw || is_csrrwi) begin
-                        // CSR = rs1_val or imm
+                        `ifdef VIGNA_CORE_INTERRUPT
+                        if (csr_addr == CSR_MSTATUS) mstatus_r <= op2;
+                        else if (csr_addr == CSR_MIE) mie_r <= op2;
+                        else if (csr_addr == CSR_MTVEC) mtvec_r <= op2;
+                        else if (csr_addr == CSR_MSCRATCH) mscratch_r <= op2;
+                        else if (csr_addr == CSR_MEPC) mepc_r <= op2;
+                        else if (csr_addr == CSR_MCAUSE) mcause_r <= op2;
+                        else if (csr_addr == CSR_MTVAL) mtval_r <= op2;
+                        else if (csr_addr == CSR_MIP) ;
+                        else csr_regs[csr_addr] <= op2;
+                        `else
                         csr_regs[csr_addr] <= op2;
+                        `endif
                     end
                     else if (is_csrrs || is_csrrsi) begin
-                        // CSR = CSR | (rs1_val or imm)
-                        if (rs1 != 0) begin // only write if rs1 != 0
+                        if (rs1 != 0) begin
+                            `ifdef VIGNA_CORE_INTERRUPT
+                            if (csr_addr == CSR_MSTATUS) mstatus_r <= op1 | op2;
+                            else if (csr_addr == CSR_MIE) mie_r <= op1 | op2;
+                            else if (csr_addr == CSR_MTVEC) mtvec_r <= op1 | op2;
+                            else if (csr_addr == CSR_MSCRATCH) mscratch_r <= op1 | op2;
+                            else if (csr_addr == CSR_MEPC) mepc_r <= op1 | op2;
+                            else if (csr_addr == CSR_MCAUSE) mcause_r <= op1 | op2;
+                            else if (csr_addr == CSR_MTVAL) mtval_r <= op1 | op2;
+                            else if (csr_addr == CSR_MIP) ;
+                            else csr_regs[csr_addr] <= op1 | op2;
+                            `else
                             csr_regs[csr_addr] <= op1 | op2;
+                            `endif
                         end
                     end
                     else if (is_csrrc || is_csrrci) begin
-                        // CSR = CSR & ~(rs1_val or imm)
-                        if (rs1 != 0) begin // only write if rs1 != 0
+                        if (rs1 != 0) begin
+                            `ifdef VIGNA_CORE_INTERRUPT
+                            if (csr_addr == CSR_MSTATUS) mstatus_r <= op1 & ~op2;
+                            else if (csr_addr == CSR_MIE) mie_r <= op1 & ~op2;
+                            else if (csr_addr == CSR_MTVEC) mtvec_r <= op1 & ~op2;
+                            else if (csr_addr == CSR_MSCRATCH) mscratch_r <= op1 & ~op2;
+                            else if (csr_addr == CSR_MEPC) mepc_r <= op1 & ~op2;
+                            else if (csr_addr == CSR_MCAUSE) mcause_r <= op1 & ~op2;
+                            else if (csr_addr == CSR_MTVAL) mtval_r <= op1 & ~op2;
+                            else if (csr_addr == CSR_MIP) ;
+                            else csr_regs[csr_addr] <= op1 & ~op2;
+                            `else
                             csr_regs[csr_addr] <= op1 & ~op2;
+                            `endif
                         end
                     end
                 `ifdef VIGNA_CORE_INTERRUPT

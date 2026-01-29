@@ -63,10 +63,10 @@
 //`define VIGNA_CORE_M_FPGA_FAST
 
 //ToDo
-//`define VIGNA_CORE_INTERRUPT
+`define VIGNA_CORE_INTERRUPT
 
 // ZICSR extension DISABLED for embedded base
-//`define VIGNA_CORE_ZICSR_EXTENSION
+`define VIGNA_CORE_ZICSR_EXTENSION
 
 /* C extension support
  * uncomment this line to enable RISC-V Compact instruction extension
